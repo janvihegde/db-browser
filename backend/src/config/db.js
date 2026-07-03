@@ -6,10 +6,21 @@ const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  port: Number(process.env.DB_PORT || 5432),
+
+  // AWS RDS PostgreSQL usually requires or supports SSL.
+  // Use rejectUnauthorized: false for quick testing only.
   ssl: {
-    rejectUnauthorized: false 
-  }
+    rejectUnauthorized: false
+  },
+
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 10
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle PostgreSQL client', err);
 });
 
 module.exports = pool;

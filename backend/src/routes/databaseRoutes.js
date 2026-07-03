@@ -118,22 +118,10 @@ router.post('/query', async (req, res) => {
     return res.status(400).json({ error: 'SQL query is required' });
   }
 
-  try {
-    // Execute the user-provided SQL
-    const { rows } = await pool.query(sql);
-    
-    res.json({ data: rows });
-  } catch (error) {
-    console.error('SQL Execution Error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/query', async (req, res) => {
-  const { sql } = req.body;
   const startTime = Date.now();
 
   try {
+    // Execute the user-provided SQL
     const { rows } = await pool.query(sql);
     const executionTime = Date.now() - startTime;
 
@@ -145,13 +133,10 @@ router.post('/query', async (req, res) => {
     
     res.json({ data: rows });
   } catch (error) {
+    console.error('SQL Execution Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
-
-const { Parser } = require('json2csv');
-
 // GET /api/database/query/export?sql=...
 router.get('/query/export', async (req, res) => {
   const { sql } = req.query; // Expecting the SQL as a query parameter
@@ -230,4 +215,13 @@ router.get('/table/:table/relationships', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch relationships' });
   }
 });
+
+const authorize = (requiredRole) => {
+  return (req, res, next) => {
+    if (req.user.role !== requiredRole && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+    next();
+  };
+};
 module.exports = router;

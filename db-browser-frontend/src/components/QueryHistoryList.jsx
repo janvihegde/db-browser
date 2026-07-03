@@ -14,16 +14,21 @@ const QueryHistoryList = ({ onSelect }) => {
 
   return (
     <List>
-      {history.map((item, index) => (
-        <ListItemButton key={index} onClick={() => onSelect(item.query)} sx={{ borderBottom: '1px solid #171717' }}>
-          <ListItemText 
-            primary={item.query.substring(0, 30) + '...'} 
-            secondary={new Date(item.executed_at).toLocaleDateString()}
-            primaryTypographyProps={{ style: { color: '#ffffff', fontSize: '0.85rem' } }}
-            secondaryTypographyProps={{ style: { color: '#525252', fontSize: '0.7rem' } }}
-          />
-        </ListItemButton>
-      ))}
+      {history.map((item, index) => {
+        // Correctly fetch 'sql_text' based on your database columns
+        const sqlString = item.sql_text || ''; 
+        
+        return (
+          <ListItemButton key={index} onClick={() => onSelect(sqlString)} sx={{ borderBottom: '1px solid #171717' }}>
+            <ListItemText 
+              primary={sqlString.length > 30 ? sqlString.substring(0, 30) + '...' : sqlString} 
+              secondary={new Date(item.executed_at).toLocaleDateString()}
+              primaryTypographyProps={{ style: { color: '#ffffff', fontSize: '0.85rem' } }}
+              secondaryTypographyProps={{ style: { color: '#525252', fontSize: '0.7rem' } }}
+            />
+          </ListItemButton>
+        );
+      })}
     </List>
   );
 };
