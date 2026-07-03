@@ -224,4 +224,50 @@ const authorize = (requiredRole) => {
     next();
   };
 };
+
+router.get('/database/relationships', async (req, res) => {
+  try {
+    const query = `
+      SELECT
+          tc.table_name AS from_table,
+          kcu.column_name AS from_column,
+          ccu.table_name AS to_table,
+          ccu.column_name AS to_column
+      FROM information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS ccu
+        ON ccu.constraint_name = tc.constraint_name
+      WHERE tc.constraint_type = 'FOREIGN KEY';
+    `;
+    const { rows } = await pool.query(query);
+    res.json({ relationships: rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch relationships' });
+  }
+});
+
+// Fetch foreign key relationships for the ER Diagram
+router.get('/relationships', async (req, res) => {
+  try {
+    const query = `
+      SELECT
+          tc.table_name AS from_table,
+          kcu.column_name AS from_column,
+          ccu.table_name AS to_table,
+          ccu.column_name AS to_column
+      FROM information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS ccu
+        ON ccu.constraint_name = tc.constraint_name
+      WHERE tc.constraint_type = 'FOREIGN KEY';
+    `;
+    const { rows } = await pool.query(query);
+    res.json({ relationships: rows });
+  } catch (error) {
+    console.error("Error fetching relationships:", error);
+    res.status(500).json({ error: 'Failed to fetch relationships' });
+  }
+});
 module.exports = router;

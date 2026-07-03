@@ -6,6 +6,46 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import api from '../services/api';
 import QueryHistoryList from './QueryHistoryList.jsx';
+import ERDiagram from './ERDiagram';
+import VisualQueryBuilder from './VisualQueryBuilder.jsx';
+import { explainSqlToEnglish } from '../utils/sqlTranslator';
+
+// Helper function to translate Postgres EXPLAIN into plain English
+const simplifyExplainPlan = (rawPlan) => {
+  if (!rawPlan) return [];
+  const lines = rawPlan.split('\n');
+  const simpleSteps = [];
+
+  lines.forEach(line => {
+    const text = line.trim();
+    if (text.startsWith('Execution Time:')) {
+      simpleSteps.push(`⏱️ ${text}`);
+    } else if (text.startsWith('Planning Time:')) {
+      simpleSteps.push(`🧠 ${text}`);
+    } else if (text.includes('Seq Scan on')) {
+      const match = text.match(/Seq Scan on (\w+)/);
+      const table = match ? match[1] : 'a table';
+      simpleSteps.push(`📖 Searched every single row in the '${table}' table (Sequential Scan). This can be slow for large tables.`);
+    } else if (text.includes('Index Scan using')) {
+      const match = text.match(/Index Scan using (\w+) on (\w+)/);
+      const index = match ? match[1] : 'an index';
+      const table = match ? match[2] : 'a table';
+      simpleSteps.push(`⚡ Quickly looked up data in '${table}' using the '${index}' index.`);
+    } else if (text.includes('Hash Join')) {
+      simpleSteps.push(`🔗 Combined two sets of data together using a Hash Join.`);
+    } else if (text.includes('Nested Loop')) {
+      simpleSteps.push(`🔄 Matched rows one-by-one between two tables (Nested Loop).`);
+    } else if (text.includes('Aggregate')) {
+      simpleSteps.push(`🧮 Calculated a summary result (like COUNT, SUM, or AVG).`);
+    } else if (text.includes('Sort')) {
+      simpleSteps.push(`🔀 Sorted the data before returning it.`);
+    } else if (text.includes('Limit')) {
+      simpleSteps.push(`✂️ Restricted the number of rows returned.`);
+    }
+  });
+
+  return simpleSteps.length > 0 ? simpleSteps : ["Could not translate this specific plan."];
+};
 
 const TableWorkspace = ({ db, schema, table, onBack }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -16,6 +56,9 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
 
   // Columns Metadata State
   const [columnsData, setColumnsData] = useState([]);
+  
+  // Query explanation state
+  const [explainPlan, setExplainPlan] = useState(null);
 
   // SQL Editor State
   const [sqlQuery, setSqlQuery] = useState(`SELECT * FROM ${schema}."${table}" LIMIT 100;`);
@@ -80,24 +123,21 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     }
   }, [db, schema, table, activeTab]);
 
-  // Handle SQL Execution
+  // Handle SQL Execution (Run Query)
   const handleRunQuery = async () => {
     if (!sqlQuery.trim()) return;
 
     setIsExecuting(true);
     setQueryError(null);
+    setExplainPlan(null);
 
     try {
       const response = await api.post('/database/query', { sql: sqlQuery });
 
       let data = [];
-      if (Array.isArray(response.data)) {
-        data = response.data;
-      } else if (response.data && Array.isArray(response.data.rows)) {
-        data = response.data.rows;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        data = response.data.data;
-      }
+      if (Array.isArray(response.data)) data = response.data;
+      else if (response.data && Array.isArray(response.data.rows)) data = response.data.rows;
+      else if (response.data && response.data.data && Array.isArray(response.data.data)) data = response.data.data;
 
       setQueryResults(data);
 
@@ -110,7 +150,39 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
       }
     } catch (err) {
       console.error("Query execution error:", err);
-      setQueryError(err.response?.data?.error || err.message || "An error occurred while executing the query.");
+      setQueryError(err.response?.data?.error || err.message || "An error occurred.");
+      setQueryResults([]);
+      setQueryColumnDefs([]);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Handle EXPLAIN ANALYZE Execution
+  const handleExplainQuery = async () => {
+    if (!sqlQuery.trim()) return;
+
+    setIsExecuting(true);
+    setQueryError(null);
+    setExplainPlan(null);
+
+    try {
+      const cleanQuery = sqlQuery.trim().replace(/;$/, '');
+      const response = await api.post('/database/query', { sql: `EXPLAIN ANALYZE ${cleanQuery}` });
+
+      let data = [];
+      if (Array.isArray(response.data)) data = response.data;
+      else if (response.data && Array.isArray(response.data.rows)) data = response.data.rows;
+      else if (response.data && response.data.data && Array.isArray(response.data.data)) data = response.data.data;
+
+      if (data.length > 0) {
+        const planKey = Object.keys(data[0])[0];
+        const planText = data.map(row => row[planKey]).join('\n');
+        setExplainPlan(planText);
+      }
+    } catch (err) {
+      console.error("Explain execution error:", err);
+      setQueryError(err.response?.data?.error || err.message || "An error occurred.");
     } finally {
       setIsExecuting(false);
     }
@@ -132,21 +204,15 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
-
       {/* Header Area */}
       <div style={{ marginBottom: '24px' }}>
         <button
           onClick={onBack}
-          style={{
-            background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer',
-            padding: 0, marginBottom: '12px', fontSize: '0.9rem'
-          }}
+          style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 0, marginBottom: '12px', fontSize: '0.9rem' }}
         >
           ← Back to Tables
         </button>
-        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 300, color: '#ffffff' }}>
-          {table}
-        </h2>
+        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 300, color: '#ffffff' }}>{table}</h2>
       </div>
 
       {/* Tabs */}
@@ -154,9 +220,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
         value={activeTab}
         onChange={(e, newValue) => setActiveTab(newValue)}
         sx={{
-          minHeight: '40px',
-          mb: 3,
-          borderBottom: '1px solid #262626',
+          minHeight: '40px', mb: 3, borderBottom: '1px solid #262626',
           '& .MuiTab-root': { color: '#a3a3a3', textTransform: 'none', fontSize: '1rem' },
           '& .Mui-selected': { color: '#ffffff !important' },
           '& .MuiTabs-indicator': { backgroundColor: '#3b82f6' }
@@ -165,108 +229,124 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
         <Tab label="Data Preview" />
         <Tab label="Columns" />
         <Tab label="SQL Editor" />
+        <Tab label="ER Diagram" />
+        <Tab label="Visual Builder" />
       </Tabs>
 
       {/* Tab Content Area */}
-      <div style={{ flexGrow: 1, backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden' }}>
-
-        {isLoading && activeTab !== 2 ? (
+      <div style={{ flexGrow: 1, backgroundColor: '#000000', borderRadius: '8px', overflow: 'hidden' }}>
+        {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress size={32} sx={{ color: '#3b82f6' }} />
           </div>
         ) : activeTab === 0 ? (
-          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%' }}>
+          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%', border: '1px solid #262626', borderRadius: '8px' }}>
             <AgGridReact rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
           </div>
         ) : activeTab === 1 ? (
-          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%' }}>
+          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%', border: '1px solid #262626', borderRadius: '8px' }}>
             <AgGridReact rowData={columnsData} columnDefs={metaColumnDefs} pagination={true} paginationPageSize={100} />
           </div>
-        ) : (
+        ) : activeTab === 2 ? (
           /* Tab 2: SQL Editor with History Sidebar */
-          <div style={{ display: 'flex', height: '100%' }}>
-
-            {/* NEW: History Panel */}
-            <div style={{ width: '250px', borderRight: '1px solid #262626', backgroundColor: '#050505', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '16px', borderBottom: '1px solid #262626', fontSize: '0.9rem', color: '#a3a3a3' }}>Query History</div>
+          <div style={{ display: 'flex', height: '100%', backgroundColor: '#000000' }}>
+            
+            {/* Left: Query History Sidebar */}
+            <div style={{ width: '250px', borderRight: '1px solid #262626', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
+              <div style={{ padding: '16px', borderBottom: '1px solid #262626', fontSize: '0.9rem', color: '#e5e5e5', fontWeight: 600 }}>
+                Query History
+              </div>
               <div style={{ flexGrow: 1, overflowY: 'auto' }}>
                 <QueryHistoryList onSelect={(q) => setSqlQuery(q)} />
               </div>
             </div>
 
-            {/* Main SQL Editor Area */}
-            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              {/* Top Half: Code Editor */}
-              <div style={{ height: '40%', borderBottom: '1px solid #262626', paddingTop: '16px' }}>
-                <Editor
-                  height="100%"
-                  defaultLanguage="sql"
-                  theme="vs-dark"
-                  value={sqlQuery}
-                  onChange={(value) => setSqlQuery(value)}
-                  options={{ minimap: { enabled: false }, fontSize: 14, padding: { top: 16 } }}
-                />
+            {/* Right: Editor Workspace (SCROLL FIX APPLIED HERE) */}
+            {/* Added overflowY: 'auto' and minHeight: 0 to ensure proper bounds */}
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, padding: '20px', gap: '20px', overflowY: 'auto' }}>
+              
+              {/* Card 1: SQL Editor */}
+              {/* Added flexShrink: 0 so it doesn't get squished, ensuring the internal scrollbar works */}
+              <div style={{ flexShrink: 0, height: '40%', minHeight: '250px', backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                <div style={{ padding: '8px 16px', backgroundColor: '#111111', borderBottom: '1px solid #262626', fontSize: '0.75rem', fontWeight: 600, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+                  Query Editor
+                </div>
+                
+                {/* Monaco Editor Container */}
+                <div style={{ flexGrow: 1, position: 'relative' }}>
+                  <Editor 
+                    height="100%" 
+                    defaultLanguage="sql" 
+                    theme="vs-dark" 
+                    value={sqlQuery} 
+                    onChange={(value) => setSqlQuery(value)} 
+                    options={{ 
+                      minimap: { enabled: false }, 
+                      fontSize: 14, 
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',          // Wraps long lines so horizontal scroll doesn't break
+                      automaticLayout: true    // CRITICAL FIX: Tells Monaco to respect Flexbox bounds and scroll internally
+                    }} 
+                  />
+                </div>
               </div>
 
-              {/* Middle Bar: Action Buttons */}
-              <div style={{
-                padding: '12px 24px',
-                backgroundColor: '#111111',
-                borderBottom: '1px solid #262626',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px'
-              }}>
-                <button
-                  onClick={handleRunQuery}
-                  disabled={isExecuting}
-                  style={{
-                    backgroundColor: isExecuting ? '#1e3a8a' : '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 24px',
-                    borderRadius: '4px',
-                    cursor: isExecuting ? 'not-allowed' : 'pointer',
-                    fontWeight: 600
-                  }}
-                >
+              {/* Card 2: Action Buttons */}
+              <div style={{ flexShrink: 0, padding: '16px 24px', backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                <button onClick={handleRunQuery} disabled={isExecuting} style={{ backgroundColor: isExecuting ? '#1e3a8a' : '#2563eb', color: '#ffffff', border: 'none', padding: '10px 24px', borderRadius: '6px', cursor: isExecuting ? 'not-allowed' : 'pointer', fontWeight: 600, transition: 'background-color 0.2s' }}>
                   {isExecuting ? 'Executing...' : '▶ Run Query'}
                 </button>
 
-                <button
-                  onClick={handleExportCSV}
-                  disabled={queryResults.length === 0}
-                  style={{
-                    backgroundColor: queryResults.length === 0 ? '#171717' : '#059669',
-                    color: queryResults.length === 0 ? '#525252' : '#ffffff',
-                    border: '1px solid',
-                    borderColor: queryResults.length === 0 ? '#262626' : '#059669',
-                    padding: '7px 20px',
-                    borderRadius: '4px',
-                    cursor: queryResults.length === 0 ? 'not-allowed' : 'pointer',
-                    fontWeight: 500
-                  }}
-                >
-                  ↓ Download CSV
+                <button onClick={handleExplainQuery} disabled={isExecuting} style={{ backgroundColor: '#4c1d95', color: '#ffffff', border: '1px solid #7c3aed', padding: '9px 20px', borderRadius: '6px', cursor: isExecuting ? 'not-allowed' : 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
+                  ⚡ Explain Plan
                 </button>
 
-                {queryError && (
-                  <div style={{ color: '#ef4444', fontSize: '0.9rem', fontFamily: 'monospace', marginLeft: 'auto' }}>
-                    <strong>Error:</strong> {queryError}
-                  </div>
-                )}
+                <button onClick={handleExportCSV} disabled={queryResults.length === 0} style={{ backgroundColor: queryResults.length === 0 ? '#171717' : '#059669', color: queryResults.length === 0 ? '#525252' : '#ffffff', border: '1px solid', borderColor: queryResults.length === 0 ? '#262626' : '#059669', padding: '9px 20px', borderRadius: '6px', cursor: queryResults.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
+                  ↓ Download CSV
+                </button>
+                {queryError && <div style={{ color: '#ef4444', fontSize: '0.9rem', fontFamily: 'monospace', marginLeft: 'auto', backgroundColor: '#450a0a', padding: '8px 12px', borderRadius: '4px' }}><strong>Error:</strong> {queryError}</div>}
               </div>
 
-              {/* Bottom Half: Results Grid */}
-              <div className="ag-theme-alpine-dark" style={{ flexGrow: 1, minHeight: '300px', width: '100%' }}>
-                <AgGridReact
-                  rowData={queryResults}
-                  columnDefs={queryColumnDefs}
-                  pagination={true}
-                  paginationPageSize={100}
-                />
+              {/* Card 3: Results Grid OR Explain Plan Output */}
+              {/* Added flexShrink: 0 so if the window is tiny, you scroll the page instead of squishing the grid */}
+              <div className="ag-theme-alpine-dark" style={{ flexShrink: 0, height: '400px', width: '100%', position: 'relative', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                {explainPlan ? (
+                  <div style={{ padding: '24px', backgroundColor: '#0a0a0a', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <span style={{ color: '#a855f7', fontWeight: 600, fontSize: '1.2rem' }}>Query Execution Explained</span>
+                      <button onClick={() => setExplainPlan(null)} style={{ background: '#262626', border: 'none', color: '#e5e5e5', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>✕ Close</button>
+                    </div>
+                    
+                    <div style={{ padding: '20px', backgroundColor: '#171717', border: '1px solid #7c3aed', borderRadius: '8px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                       {simplifyExplainPlan(explainPlan).map((step, idx) => (
+                         <div key={idx} style={{ color: '#e5e5e5', fontSize: '1.05rem', lineHeight: '1.6' }}>{step}</div>
+                       ))}
+                    </div>
+
+                    <span style={{ color: '#525252', fontSize: '0.8rem', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raw Postgres Output</span>
+                    <pre style={{ margin: 0, padding: '16px', backgroundColor: '#000', border: '1px solid #262626', borderRadius: '6px', color: '#a3a3a3', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', lineHeight: '1.5' }}>
+                      {explainPlan}
+                    </pre>
+                  </div>
+                ) : (
+                  <AgGridReact rowData={queryResults} columnDefs={queryColumnDefs} pagination={true} paginationPageSize={100} />
+                )}
               </div>
             </div>
+          </div>
+        ) : activeTab === 3 ? (
+          <div style={{ border: '1px solid #262626', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
+             <ERDiagram />
+          </div>
+        ) : (
+          /* Tab 4: Visual Query Builder */
+          <div style={{ border: '1px solid #262626', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
+             <VisualQueryBuilder
+               onGenerateSql={(sql) => {
+                 setSqlQuery(sql);
+                 setActiveTab(2); // Jump to SQL Editor tab
+               }}
+             />
           </div>
         )}
       </div>
