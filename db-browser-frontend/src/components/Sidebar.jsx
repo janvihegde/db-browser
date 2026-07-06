@@ -1,220 +1,181 @@
-import React, { useEffect, useState } from 'react';
-import { List, ListItem, ListItemButton, ListItemText, Typography, Collapse, TextField, InputAdornment, CircularProgress } from '@mui/material';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import SearchIcon from '@mui/icons-material/Search';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
 const Sidebar = ({ selectedDb, onSelectDb, selectedSchema, onSelectSchema }) => {
   const [databases, setDatabases] = useState([]);
+  const [schemas, setSchemas] = useState([]);
   const [expandedDb, setExpandedDb] = useState(null);
-  const [schemas, setSchemas] = useState({}); 
   
-  // New Search State
-  const [searchTerm, setSearchTerm] = useState('');
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Fetch Databases on load
+  // Initial load: Fetch databases
   useEffect(() => {
     api.get('/database/list')
-      .then(response => {
-        if (response.data?.databases) setDatabases(response.data.databases);
-      })
-      .catch(err => console.error("Error fetching databases:", err));
+      .then(res => setDatabases(res.data.databases || []))
+      .catch(err => console.error("Failed to fetch DBs", err));
   }, []);
 
-  // Handle Search with a 500ms Debounce
+  // Fetch schemas when a DB is expanded
   useEffect(() => {
-    if (!searchTerm.trim()) {
+    if (expandedDb) {
+      api.get(`/database/${expandedDb}/schemas`)
+        .then(res => setSchemas(res.data.schemas || []))
+        .catch(err => console.error("Failed to fetch schemas", err));
+    }
+  }, [expandedDb]);
+
+  // Handle Search Input with 300ms Debounce
+  useEffect(() => {
+    if (!searchQuery.trim()) {
       setSearchResults(null);
       return;
     }
 
-    const delayDebounceFn = setTimeout(() => {
+    const timer = setTimeout(() => {
       setIsSearching(true);
-      api.get(`/database/search?query=${encodeURIComponent(searchTerm)}`)
-        .then(response => {
-          // Aggressively hunt for the data array just like we did in the SQL Editor
-          let data = [];
-          if (Array.isArray(response.data)) data = response.data;
-          else if (response.data && Array.isArray(response.data.rows)) data = response.data.rows;
-          else if (response.data && response.data.data && Array.isArray(response.data.data)) data = response.data.data;
-          else if (response.data && response.data.results) data = response.data.results;
-          
-          setSearchResults(data);
-          setIsSearching(false);
-        })
-        .catch(err => {
-          console.error("Error searching:", err);
-          setSearchResults([]);
-          setIsSearching(false);
-        });
-    }, 500);
+      api.get(`/database/search?query=${searchQuery}`)
+        .then(res => setSearchResults(res.data.results || []))
+        .catch(err => console.error("Search failed", err))
+        .finally(() => setIsSearching(false));
+    }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Handle clicking a database
-  const handleDbClick = async (dbName) => {
-    onSelectDb(dbName);
-    onSelectSchema(null); 
-    
-    const isExpanding = expandedDb !== dbName;
-    setExpandedDb(isExpanding ? dbName : null);
+  const handleDbClick = (db) => {
+    setExpandedDb(expandedDb === db ? null : db);
+    onSelectDb(db);
+    onSelectSchema(null); // Reset schema when DB changes
+  };
 
-    if (isExpanding && !schemas[dbName]) {
-      try {
-        const response = await api.get(`/database/${dbName}/schemas`);
-        if (response.data?.schemas) {
-          setSchemas(prev => ({ ...prev, [dbName]: response.data.schemas }));
-        }
-      } catch (error) {
-        console.error("Error fetching schemas:", error);
-      }
-    }
+  const handleSchemaClick = (schema) => {
+    onSelectSchema(schema);
   };
 
   return (
-    <div style={{
-      width: '320px', // Widened slightly to accommodate the search bar nicely
-      height: '100%',
-      backgroundColor: '#0a0a0a', 
-      borderRight: '1px solid #262626',
-      color: '#ededed',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Header & Search Bar Area */}
-      <div style={{ padding: '30px 24px 20px 24px', borderBottom: '1px solid #262626' }}>
-        <Typography variant="h5" sx={{ fontWeight: 300, letterSpacing: '1px', color: '#ffffff', mb: 3 }}>
-          Data Explorer
-        </Typography>
-        
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Search tables & columns..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ color: '#737373', fontSize: '1.2rem' }} />
-              </InputAdornment>
-            ),
-            style: { backgroundColor: '#171717', borderRadius: '8px', fontSize: '0.95rem', height: '44px' }
+    <div style={{ width: '280px', backgroundColor: '#0a0a0a', borderRight: '1px solid #262626', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      
+      {/* Search Bar Area */}
+      <div style={{ padding: '16px', borderBottom: '1px solid #262626', backgroundColor: '#111111' }}>
+        <input 
+          type="text" 
+          placeholder="Search tables & columns..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ 
+            width: '100%', 
+            padding: '10px 12px', 
+            backgroundColor: '#000000', 
+            color: '#e5e5e5',
+            border: '1px solid #333', 
+            borderRadius: '6px',
+            outline: 'none',
+            fontSize: '0.9rem',
+            transition: 'border-color 0.2s'
           }}
-          sx={{
-            // Force the typed text to be white
-            '& .MuiInputBase-input': { 
-              color: '#ffffff',
-            },
-            // Keep the placeholder text visible but dimmed
-            '& .MuiInputBase-input::placeholder': {
-              color: '#a3a3a3',
-              opacity: 1,
-            },
-            '& .MuiOutlinedInput-root': {
-              '& fieldset': { borderColor: '#262626' },
-              '&:hover fieldset': { borderColor: '#404040' },
-              '&.Mui-focused fieldset': { borderColor: '#3b82f6', borderWidth: '1px' },
-            }
-          }}
+          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+          onBlur={(e) => e.target.style.borderColor = '#333'}
         />
       </div>
 
-      {/* Main List Area */}
-      <List sx={{ flexGrow: 1, padding: '16px 12px', overflowY: 'auto' }}>
+      {/* Navigation Tree or Search Results */}
+      <div style={{ flexGrow: 1, overflowY: 'auto', padding: '16px' }}>
         
-        {/* Conditional Rendering: Show Search Results OR the normal Database List */}
-        {searchTerm.trim() ? (
-          
-          isSearching ? (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-              <CircularProgress size={24} sx={{ color: '#3b82f6' }} />
+        {searchQuery.trim() ? (
+          /* --- SEARCH RESULTS VIEW --- */
+          <div>
+            <div style={{ fontSize: '0.8rem', color: '#a3a3a3', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {isSearching ? 'Searching...' : 'Search Results'}
             </div>
-          ) : searchResults && searchResults.length > 0 ? (
-            searchResults.map((result, idx) => {
-              // Gracefully extract names based on how your backend returns the search matches
-              const itemName = result.table_name || result.column_name || result.name || "Unknown Item";
-              const itemDetail = result.column_name ? `Column in ${result.table_name}` : `Table in ${result.table_schema || 'schema'}`;
-              
-              return (
-                <ListItem disablePadding key={idx} sx={{ mb: 0.5 }}>
-                  <ListItemButton sx={{ borderRadius: '6px', '&:hover': { backgroundColor: '#171717' } }}>
-                    <ListItemText 
-                      primary={itemName} 
-                      secondary={itemDetail}
-                      primaryTypographyProps={{ style: { color: '#ffffff', fontSize: '0.95rem', fontWeight: 500 } }}
-                      secondaryTypographyProps={{ style: { color: '#a3a3a3', fontSize: '0.8rem' } }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              )
-            })
-          ) : (
-            <Typography sx={{ color: '#737373', textAlign: 'center', mt: 4, fontSize: '0.95rem' }}>
-              No matches found for "{searchTerm}"
-            </Typography>
-          )
+            
+            {!isSearching && searchResults && searchResults.length === 0 && (
+              <div style={{ color: '#ef4444', fontSize: '0.9rem' }}>No matches found.</div>
+            )}
 
-        ) : (
-          
-          /* Normal Database List */
-          databases.map((db) => {
-            const isDbExpanded = expandedDb === db;
-            return (
-              <React.Fragment key={db}>
-                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                  <ListItemButton 
-                    onClick={() => handleDbClick(db)}
-                    sx={{
-                      borderRadius: '6px',
-                      backgroundColor: isDbExpanded ? '#1a1a1a' : 'transparent',
-                      '&:hover': { backgroundColor: '#171717' },
+            {!isSearching && searchResults && searchResults.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {searchResults.map((result, idx) => (
+                  <div key={idx} 
+                    onClick={() => {
+                       // Ensure the correct DB/Schema is selected before diving in
+                       // Note: Assumes current selectedDb if backend doesn't explicitly return db name
+                       if (!selectedDb && databases.length > 0) onSelectDb(databases[0]);
+                       onSelectSchema(result.table_schema);
+                       // We clear the search to let App.jsx render the schema view
+                       setSearchQuery('');
                     }}
+                    style={{ padding: '10px', backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '6px', cursor: 'pointer' }}
                   >
-                    <ListItemText 
-                      primary={db} 
-                      primaryTypographyProps={{ style: { fontWeight: isDbExpanded ? 600 : 400, fontSize: '0.95rem' } }}
-                    />
-                    {isDbExpanded ? <ExpandLess sx={{ color: '#a3a3a3' }}/> : <ExpandMore sx={{ color: '#a3a3a3' }}/>}
-                  </ListItemButton>
-                </ListItem>
+                    <div style={{ fontWeight: 600, color: result.type === 'table' ? '#10b981' : '#3b82f6', fontSize: '0.95rem' }}>
+                      {result.type === 'table' ? '📊 Table: ' : '🔤 Column: '} 
+                      <span style={{ color: '#fff' }}>{result.name}</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#a3a3a3', marginTop: '4px' }}>
+                      Located in schema: <strong style={{ color: '#d4d4d4' }}>{result.table_schema}</strong>
+                      {result.type === 'column' && <span> • Table: <strong style={{ color: '#d4d4d4' }}>{result.table_name}</strong></span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* --- NORMAL NAVIGATION TREE --- */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '0.8rem', color: '#a3a3a3', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Databases</div>
+            {databases.map(dbName => (
+              <div key={dbName}>
+                {/* Database Node */}
+                <div 
+                  onClick={() => handleDbClick(dbName)}
+                  style={{ 
+                    padding: '8px 12px', 
+                    cursor: 'pointer', 
+                    borderRadius: '4px',
+                    backgroundColor: selectedDb === dbName ? '#1e3a8a' : 'transparent',
+                    color: selectedDb === dbName ? '#60a5fa' : '#e5e5e5',
+                    fontWeight: selectedDb === dbName ? 600 : 400,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {expandedDb === dbName ? '📂' : '📁'} {dbName}
+                </div>
 
-                <Collapse in={isDbExpanded} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {(schemas[db] || []).map((schemaObj) => {
-                      const schemaName = schemaObj.schema_name || schemaObj;
-                      const isSchemaSelected = selectedSchema === schemaName;
-
-                      return (
-                        <ListItemButton
-                          key={schemaName}
-                          onClick={() => onSelectSchema(schemaName)}
-                          sx={{
-                            pl: 4, 
-                            borderRadius: '6px',
-                            mb: 0.5,
-                            backgroundColor: isSchemaSelected ? '#262626' : 'transparent',
-                            '&:hover': { backgroundColor: '#1f1f1f' },
-                          }}
-                        >
-                          <ListItemText 
-                            primary={schemaName} 
-                            primaryTypographyProps={{ style: { color: isSchemaSelected ? '#ffffff' : '#a3a3a3', fontSize: '0.85rem' } }}
-                          />
-                        </ListItemButton>
-                      );
-                    })}
-                  </List>
-                </Collapse>
-              </React.Fragment>
-            );
-          })
+                {/* Schema Children */}
+                {expandedDb === dbName && (
+                  <div style={{ paddingLeft: '24px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {schemas.map(schema => (
+                      <div 
+                        key={schema}
+                        onClick={() => handleSchemaClick(schema)}
+                        style={{ 
+                          padding: '6px 12px', 
+                          cursor: 'pointer', 
+                          borderRadius: '4px',
+                          backgroundColor: selectedSchema === schema ? '#064e3b' : 'transparent',
+                          color: selectedSchema === schema ? '#34d399' : '#a3a3a3',
+                          fontSize: '0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          borderLeft: '1px solid #262626'
+                        }}
+                      >
+                        📄 {schema}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
-      </List>
+      </div>
     </div>
   );
 };

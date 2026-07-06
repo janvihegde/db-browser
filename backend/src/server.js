@@ -1,19 +1,34 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
-const app = express();
+// 1. Import Routes & Middleware
+const databaseRoutes = require('./routes/databaseRoutes');
+const authRoutes = require('./routes/authRoutes');
+const { requireAuth } = require('./middleware/auth');
+
+// 2. Initialize 'app'
+const app = express(); 
 const PORT = process.env.PORT || 5000;
 
-
-app.use(cors());
+// 3. Setup Global Middleware (Must be BEFORE routes)
+// IMPORTANT: CORS must be configured to allow credentials (cookies)
+app.use(cors({
+    origin: 'http://localhost:5173', // Your Vite frontend URL
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
-// We will import our routes here shortly
-const databaseRoutes = require('./routes/databaseRoutes');
-app.use('/api/database', databaseRoutes);
+// 4. Register Routes
+// Mount Auth routes (Unprotected - so users can actually log in)
+app.use('/api/auth', authRoutes);
 
-// Start 
+// Protect all database routes (Users MUST have a valid token to access anything here)
+app.use('/api/database', requireAuth, databaseRoutes);
+
+// 5. Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

@@ -8,7 +8,7 @@ import api from '../services/api';
 import QueryHistoryList from './QueryHistoryList.jsx';
 import ERDiagram from './ERDiagram';
 import VisualQueryBuilder from './VisualQueryBuilder.jsx';
-import { explainSqlToEnglish } from '../utils/sqlTranslator';
+import Toast from './Toast.jsx'; // Assuming you created this from Priority 2!
 
 // Helper function to translate Postgres EXPLAIN into plain English
 const simplifyExplainPlan = (rawPlan) => {
@@ -68,6 +68,19 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   const [queryError, setQueryError] = useState(null);
 
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Row Count State (Properly placed inside the component!)
+  const [rowCount, setRowCount] = useState(null);
+
+  // Fetch row count whenever the table changes
+  useEffect(() => {
+   console.log("Fetching row count for table:", table); // ADD THIS
+    if (!table) return; 
+    setRowCount(null);
+    api.get(`/database/table/${table}/count`)
+      .then(res => setRowCount(res.data.rowCount))
+      .catch(err => console.error("Failed to fetch count:", err));
+  }, [table]);
 
   // Fetch data when switching to Preview or Columns tabs
   useEffect(() => {
@@ -199,11 +212,25 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   const metaColumnDefs = [
     { field: 'column_name', headerName: 'Column Name', flex: 1, sortable: true, filter: true },
     { field: 'data_type', headerName: 'Data Type', flex: 1, sortable: true, filter: true },
-    { field: 'is_nullable', headerName: 'Nullable', flex: 1, sortable: true, filter: true },
+    { 
+      field: 'is_primary_key', 
+      headerName: 'PK', 
+      width: 100,
+      cellRenderer: (params) => params.value ? '🔑 Yes' : ''
+    },
+    { 
+      field: 'is_foreign_key', 
+      headerName: 'FK', 
+      width: 100,
+      cellRenderer: (params) => params.value ? '🔗 Yes' : ''
+    },
+    { field: 'is_nullable', headerName: 'Nullable', width: 120, sortable: true, filter: true },
+    { field: 'column_default', headerName: 'Default Value', flex: 1, sortable: true, filter: true },
   ];
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+      
       {/* Header Area */}
       <div style={{ marginBottom: '24px' }}>
         <button
@@ -212,7 +239,14 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
         >
           ← Back to Tables
         </button>
-        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 300, color: '#ffffff' }}>{table}</h2>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
+          <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 300, color: '#ffffff' }}>{table}</h2>
+          {rowCount !== null && (
+             <span style={{ color: '#a3a3a3', fontSize: '1.1rem', backgroundColor: '#171717', padding: '4px 12px', borderRadius: '16px', border: '1px solid #262626' }}>
+               {Number(rowCount).toLocaleString()} Rows
+             </span>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -261,12 +295,10 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
               </div>
             </div>
 
-            {/* Right: Editor Workspace (SCROLL FIX APPLIED HERE) */}
-            {/* Added overflowY: 'auto' and minHeight: 0 to ensure proper bounds */}
+            {/* Right: Editor Workspace */}
             <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, padding: '20px', gap: '20px', overflowY: 'auto' }}>
               
               {/* Card 1: SQL Editor */}
-              {/* Added flexShrink: 0 so it doesn't get squished, ensuring the internal scrollbar works */}
               <div style={{ flexShrink: 0, height: '40%', minHeight: '250px', backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                 <div style={{ padding: '8px 16px', backgroundColor: '#111111', borderBottom: '1px solid #262626', fontSize: '0.75rem', fontWeight: 600, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
                   Query Editor
@@ -284,8 +316,8 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
                       minimap: { enabled: false }, 
                       fontSize: 14, 
                       scrollBeyondLastLine: false,
-                      wordWrap: 'on',          // Wraps long lines so horizontal scroll doesn't break
-                      automaticLayout: true    // CRITICAL FIX: Tells Monaco to respect Flexbox bounds and scroll internally
+                      wordWrap: 'on',
+                      automaticLayout: true 
                     }} 
                   />
                 </div>
@@ -304,11 +336,9 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
                 <button onClick={handleExportCSV} disabled={queryResults.length === 0} style={{ backgroundColor: queryResults.length === 0 ? '#171717' : '#059669', color: queryResults.length === 0 ? '#525252' : '#ffffff', border: '1px solid', borderColor: queryResults.length === 0 ? '#262626' : '#059669', padding: '9px 20px', borderRadius: '6px', cursor: queryResults.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
                   ↓ Download CSV
                 </button>
-                {queryError && <div style={{ color: '#ef4444', fontSize: '0.9rem', fontFamily: 'monospace', marginLeft: 'auto', backgroundColor: '#450a0a', padding: '8px 12px', borderRadius: '4px' }}><strong>Error:</strong> {queryError}</div>}
               </div>
 
               {/* Card 3: Results Grid OR Explain Plan Output */}
-              {/* Added flexShrink: 0 so if the window is tiny, you scroll the page instead of squishing the grid */}
               <div className="ag-theme-alpine-dark" style={{ flexShrink: 0, height: '400px', width: '100%', position: 'relative', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                 {explainPlan ? (
                   <div style={{ padding: '24px', backgroundColor: '#0a0a0a', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -350,6 +380,15 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
           </div>
         )}
       </div>
+
+      {/* Global Error Toast */}
+      {queryError && (
+        <Toast 
+          message={queryError} 
+          type="error" 
+          onClose={() => setQueryError(null)} 
+        />
+      )}
     </div>
   );
 };
