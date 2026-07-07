@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar.jsx';
 import TableWorkspace from './components/TableWorkspace.jsx';
 import Login from './components/Login.jsx';
 import api from './services/api';
-import DatabaseStats from './components/DatabaseStats.jsx';
 
 function App() {
   // Database/Workspace State
@@ -88,9 +87,6 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>
             Logged in as <strong style={{ color: 'var(--text-primary)' }}>{user.email}</strong> 
-            <span style={{ backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', marginLeft: '8px', color: 'var(--accent-green)' }}>
-              {user.role}
-            </span>
           </span>
           <button 
             onClick={handleLogout} 
@@ -114,12 +110,12 @@ function App() {
         
         <main style={{ padding: '60px', flexGrow: 1, backgroundColor: 'var(--bg-main)', overflowY: 'auto' }}>
           {selectedTable ? (
-  <TableWorkspace 
-    db={selectedDb} 
-    schema={selectedSchema} 
-    table={selectedTable} 
-    onBack={() => setSelectedTable(null)} 
-  />
+            <TableWorkspace 
+              db={selectedDb} 
+              schema={selectedSchema} 
+              table={selectedTable} 
+              onBack={() => setSelectedTable(null)} 
+            />
           ) : selectedSchema ? (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
               <h1 style={{ marginTop: 0, fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
@@ -162,16 +158,14 @@ function App() {
               </div>
             </div>
           ) : selectedDb ? (
-             <DatabaseStats db={selectedDb} />
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', color: 'var(--text-secondary)' }}>
+              <h1 style={{ marginTop: 0, fontWeight: 200, fontSize: '3rem', letterSpacing: '-1px', color: 'var(--text-primary)' }}>
+                {selectedDb}
+              </h1>
+              <p style={{ fontSize: '1.2rem' }}>Expand the database on the left and select a schema to view tables.</p>
+            </div>
           ) : (
-            <div style={{ 
-              height: '100%', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'center', 
-              alignItems: 'flex-start', 
-              color: 'var(--text-secondary)' 
-            }}>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', color: 'var(--text-secondary)' }}>
               <h1 style={{ marginTop: 0, fontWeight: 200, fontSize: '3rem', letterSpacing: '-1px', color: 'var(--text-primary)' }}>
                 Database Workspace
               </h1>
