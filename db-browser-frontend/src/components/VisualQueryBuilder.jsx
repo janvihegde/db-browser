@@ -166,16 +166,16 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
   }, [canvasTables, joins, selectedColumns, whereFilters, insertData, queryMode]);
 
   return (
-    <div style={{ display: 'flex', height: '100%', color: '#e5e5e5', fontFamily: 'sans-serif' }}>
-      
+    <div style={{ display: 'flex', height: '100%', color: 'var(--text-primary)' }}>
+
       {/* Left Sidebar */}
-      <div style={{ width: '250px', borderRight: '1px solid #262626', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #262626', fontWeight: 600, color: '#3b82f6' }}>Actual DB Tables</div>
+      <div style={{ width: '250px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', fontWeight: 600, color: 'var(--accent-purple)' }}>Actual DB Tables</div>
         <div style={{ padding: '16px', overflowY: 'auto', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {availableTables.map(table => (
             <div 
               key={table} draggable onDragStart={(e) => handleDragStart(e, table)}
-              style={{ padding: '10px 14px', backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '6px', cursor: 'grab', fontSize: '0.9rem' }}
+              style={{ padding: '10px 14px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'grab', fontSize: '0.9rem' }}
             >
               ⠿ {table}
             </div>
@@ -183,25 +183,25 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
         </div>
       </div>
 
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000000', overflowY: 'auto' }}>
+      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-main)', overflowY: 'auto' }}>
         
         {/* Mode Toggle & Canvas */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid #262626', backgroundColor: isDraggingOver ? '#0f172a' : 'transparent', transition: 'all 0.2s', minHeight: '200px' }}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-color)', backgroundColor: isDraggingOver ? 'rgba(139, 92, 246, 0.08)' : 'transparent', transition: 'all 0.2s', minHeight: '200px' }}
              onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}>
           
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button onClick={() => setQueryMode('SELECT')} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: queryMode === 'SELECT' ? '#3b82f6' : '#262626', color: '#fff', cursor: 'pointer' }}>SELECT (Analytics)</button>
-            <button onClick={() => setQueryMode('INSERT')} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: queryMode === 'INSERT' ? '#10b981' : '#262626', color: '#fff', cursor: 'pointer' }}>INSERT (Add Data)</button>
+            <button onClick={() => setQueryMode('SELECT')} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: queryMode === 'SELECT' ? 'var(--accent-purple)' : 'var(--border-color)', color: '#fff', cursor: 'pointer' }}>SELECT (Analytics)</button>
+            <button onClick={() => setQueryMode('INSERT')} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: queryMode === 'INSERT' ? 'var(--accent-green)' : 'var(--border-color)', color: '#fff', cursor: 'pointer' }}>INSERT (Add Data)</button>
           </div>
 
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             {canvasTables.length === 0 ? (
-              <div style={{ width: '100%', padding: '40px', textAlign: 'center', color: '#525252', border: '2px dashed #262626', borderRadius: '8px' }}>
+              <div style={{ width: '100%', padding: '40px', textAlign: 'center', color: 'var(--text-secondary)', border: '2px dashed var(--border-color)', borderRadius: '8px' }}>
                 Drag {queryMode === 'INSERT' ? 'a table' : 'tables'} here from the sidebar
               </div>
             ) : (
               canvasTables.map(table => (
-                <div key={table} style={{ padding: '16px', backgroundColor: '#171717', border: '1px solid #3b82f6', borderRadius: '8px', minWidth: '150px' }}>
+                <div key={table} style={{ padding: '16px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--accent-purple)', borderRadius: '8px', minWidth: '150px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                     {table} <button onClick={() => removeTable(table)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>×</button>
                   </div>
@@ -213,17 +213,17 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
 
         {/* --- INSERT DATA FORM --- */}
         {queryMode === 'INSERT' && canvasTables.length > 0 && (
-          <div style={{ padding: '20px', backgroundColor: '#0a0a0a', borderBottom: '1px solid #262626' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#10b981' }}>Insert Data into {canvasTables[0]}</h3>
+          <div style={{ padding: '20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--accent-green)' }}>Insert Data into {canvasTables[0]}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               {(tableColumns[canvasTables[0]] || []).map(col => (
                 <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.85rem', color: '#a3a3a3' }}>{col}</label>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{col}</label>
                   <input 
                     type="text" 
                     placeholder={`Value for ${col}...`}
                     onChange={(e) => setInsertData({ ...insertData, [col]: e.target.value })}
-                    style={{ padding: '8px', background: '#000', color: '#fff', border: '1px solid #333', borderRadius: '4px' }}
+                    style={{ padding: '8px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px' }}
                   />
                 </div>
               ))}
@@ -236,25 +236,25 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
           <>
             {/* JOINS */}
             {canvasTables.length > 1 && (
-              <div style={{ padding: '20px', backgroundColor: '#0a0a0a', borderBottom: '1px solid #262626' }}>
+              <div style={{ padding: '20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
                  {/* Join UI identical to previous version goes here. Omitted for brevity in text, but active in code structure */}
                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#3b82f6' }}>Joins</h3>
-                  <button onClick={addJoin} style={{ padding: '6px 12px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Join</button>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent-purple)' }}>Joins</h3>
+                  <button onClick={addJoin} style={{ padding: '6px 12px', backgroundColor: 'var(--accent-purple)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Join</button>
                 </div>
                 {joins.map((join, index) => (
                   <div key={index} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                     <select value={join.fromTable} onChange={e => updateJoin(index, 'fromTable', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                     <select value={join.fromTable} onChange={e => updateJoin(index, 'fromTable', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                       {canvasTables.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                    <select value={join.fromCol} onChange={e => updateJoin(index, 'fromCol', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                    <select value={join.fromCol} onChange={e => updateJoin(index, 'fromCol', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                       {(tableColumns[join.fromTable] || []).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <span style={{color: '#3b82f6', alignSelf: 'center', fontWeight: 'bold'}}>=</span>
-                    <select value={join.toTable} onChange={e => updateJoin(index, 'toTable', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                    <span style={{color: 'var(--accent-purple)', alignSelf: 'center', fontWeight: 'bold'}}>=</span>
+                    <select value={join.toTable} onChange={e => updateJoin(index, 'toTable', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                       {canvasTables.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                    <select value={join.toCol} onChange={e => updateJoin(index, 'toCol', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                    <select value={join.toCol} onChange={e => updateJoin(index, 'toCol', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                       {(tableColumns[join.toTable] || []).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <button onClick={() => removeJoin(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
@@ -264,23 +264,23 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
             )}
 
             {/* COLUMNS & FUNCTIONS */}
-            <div style={{ padding: '20px', backgroundColor: '#0a0a0a', borderBottom: '1px solid #262626' }}>
+            <div style={{ padding: '20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#a855f7' }}>Select & Functions</h3>
-                <button onClick={addColumn} style={{ padding: '6px 12px', backgroundColor: '#a855f7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Column</button>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent-purple)' }}>Select & Functions</h3>
+                <button onClick={addColumn} style={{ padding: '6px 12px', backgroundColor: 'var(--accent-purple)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Column</button>
               </div>
               {selectedColumns.map((col, index) => (
                 <div key={index} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                  <select value={col.func} onChange={e => updateColumn(index, 'func', e.target.value)} style={{ padding: '6px', background: '#000', color: '#a855f7', border: '1px solid #333', fontWeight: 'bold' }}>
+                  <select value={col.func} onChange={e => updateColumn(index, 'func', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--accent-purple)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                     <option value="">No Function</option>
                     {Object.entries(PG_FUNCTIONS).map(([group, funcs]) => (
                       group !== 'None' && <optgroup key={group} label={group}>{funcs.map(f => <option key={f} value={f}>{f}</option>)}</optgroup>
                     ))}
                   </select>
-                  <select value={col.table} onChange={e => updateColumn(index, 'table', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                  <select value={col.table} onChange={e => updateColumn(index, 'table', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                     {canvasTables.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
-                  <select value={col.column} onChange={e => updateColumn(index, 'column', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                  <select value={col.column} onChange={e => updateColumn(index, 'column', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                     <option value="*">* (All Columns)</option>
                     {(tableColumns[col.table] || []).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -290,33 +290,33 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
             </div>
 
             {/* WHERE FILTERS */}
-            <div style={{ padding: '20px', backgroundColor: '#0a0a0a', borderBottom: '1px solid #262626' }}>
+            <div style={{ padding: '20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f59e0b' }}>Filters (WHERE)</h3>
-                <button onClick={addWhere} style={{ padding: '6px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Filter</button>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent-purple)' }}>Filters (WHERE)</h3>
+                <button onClick={addWhere} style={{ padding: '6px 12px', backgroundColor: 'var(--accent-purple)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Filter</button>
               </div>
               {whereFilters.map((w, index) => (
                 <div key={index} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
                   {index > 0 && (
-                    <select value={w.logic} onChange={e => updateWhere(index, 'logic', e.target.value)} style={{ padding: '6px', background: '#000', color: '#f59e0b', border: '1px solid #333', fontWeight: 'bold' }}>
+                    <select value={w.logic} onChange={e => updateWhere(index, 'logic', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--accent-purple)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                       <option value="AND">AND</option>
                       <option value="OR">OR</option>
                     </select>
                   )}
-                  <select value={w.table} onChange={e => updateWhere(index, 'table', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                  <select value={w.table} onChange={e => updateWhere(index, 'table', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                     {canvasTables.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
-                  <select value={w.column} onChange={e => updateWhere(index, 'column', e.target.value)} style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333' }}>
+                  <select value={w.column} onChange={e => updateWhere(index, 'column', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
                     <option value="">Select Column...</option>
                     {(tableColumns[w.table] || []).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <select value={w.operator} onChange={e => updateWhere(index, 'operator', e.target.value)} style={{ padding: '6px', background: '#000', color: '#f59e0b', border: '1px solid #333', fontWeight: 'bold' }}>
+                  <select value={w.operator} onChange={e => updateWhere(index, 'operator', e.target.value)} style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--accent-purple)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                     {OPERATORS.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                   {!w.operator.includes('NULL') && (
                     <input 
                       type="text" placeholder="Value..." value={w.value} onChange={e => updateWhere(index, 'value', e.target.value)}
-                      style={{ padding: '6px', background: '#000', color: '#fff', border: '1px solid #333', flexGrow: 1 }}
+                      style={{ padding: '6px', background: 'var(--bg-main)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', flexGrow: 1 }}
                     />
                   )}
                   <button onClick={() => removeWhere(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
@@ -327,17 +327,17 @@ const VisualQueryBuilder = ({ onGenerateSql, currentSchema = 'public' }) => {
         )}
 
         {/* SQL Output Area */}
-        <div style={{ padding: '24px', backgroundColor: '#050505', minHeight: '150px' }}>
+        <div style={{ padding: '24px', backgroundColor: 'var(--bg-main)', minHeight: '150px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontWeight: 600, color: queryMode === 'INSERT' ? '#10b981' : '#3b82f6' }}>Generated {queryMode} SQL</span>
+            <span style={{ fontWeight: 600, color: queryMode === 'INSERT' ? 'var(--accent-green)' : 'var(--accent-purple)' }}>Generated {queryMode} SQL</span>
             <button 
               onClick={() => onGenerateSql(generatedSql)}
-              style={{ padding: '6px 16px', backgroundColor: queryMode === 'INSERT' ? '#10b981' : '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              style={{ padding: '6px 16px', backgroundColor: queryMode === 'INSERT' ? 'var(--accent-green)' : 'var(--accent-purple)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
               Open in Editor
             </button>
           </div>
-          <pre style={{ margin: 0, padding: '16px', backgroundColor: '#000', border: '1px solid #262626', borderRadius: '6px', overflowX: 'auto', color: '#e5e5e5', whiteSpace: 'pre-wrap' }}>
+          <pre style={{ margin: 0, padding: '16px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '6px', overflowX: 'auto', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
             {generatedSql || '-- Drag a table onto the canvas'}
           </pre>
         </div>

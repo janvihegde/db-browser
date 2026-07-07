@@ -48,7 +48,16 @@ const QueryHistoryList = ({ onSelect }) => {
         fullWidth
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        sx={{ mb: 2, input: { color: 'white' }, '& .MuiOutlinedInput-root': { borderColor: '#333' } }}
+        sx={{
+          mb: 2,
+          input: { color: 'var(--text-primary)' },
+          '& .MuiInputBase-input::placeholder': { color: 'var(--text-secondary)', opacity: 1 },
+          '& .MuiOutlinedInput-root': {
+            '& fieldset': { borderColor: 'var(--border-color)' },
+            '&:hover fieldset': { borderColor: 'var(--accent-indigo)' },
+            '&.Mui-focused fieldset': { borderColor: 'var(--accent-indigo)' }
+          }
+        }}
       />
       
       <List>
@@ -58,14 +67,14 @@ const QueryHistoryList = ({ onSelect }) => {
             <ListItemButton 
               key={index} 
               onClick={() => onSelect(sqlString)} 
-              sx={{ borderBottom: '1px solid #171717', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+              sx={{ borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
             >
-              <Typography sx={{ color: '#3b82f6', fontSize: '0.75rem', fontWeight: 'bold' }}>
+              <Typography sx={{ color: 'var(--accent-indigo)', fontSize: '0.75rem', fontWeight: 'bold' }}>
                 {getSummary(sqlString)}
               </Typography>
               <ListItemText 
                 primary={sqlString.length > 30 ? sqlString.substring(0, 30) + '...' : sqlString}
-                primaryTypographyProps={{ style: { color: '#ffffff', fontSize: '0.85rem' } }}
+                primaryTypographyProps={{ style: { color: 'var(--text-primary)', fontSize: '0.85rem' } }}
               />
             </ListItemButton>
           );

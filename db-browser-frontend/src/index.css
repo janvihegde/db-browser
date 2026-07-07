@@ -1,8 +1,32 @@
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #000000;
-  overflow: hidden; /* Prevents scrollbars on the main window */
+:root {
+  /* Surfaces */
+  --bg-page: #f8fafc;       /* app/page background (was --bg-main) */
+  --bg-surface: #ffffff;    /* cards, navbar, sidebar, panels */
+  --border-color: #e2e8f0;
+
+  /* Text */
+  --text-primary: #18181b;
+  --text-secondary: #71717a;
+
+  /* Brand accents (replaces --accent-purple / --accent-green) */
+  --accent-teal: #14b8a6;
+  --accent-indigo: #6366f1;
+  --accent-gradient: linear-gradient(135deg, #14b8a6 0%, #6366f1 100%);
+  --accent-teal-soft: #ccfbf1;   /* active nav pill, teal "positive" backgrounds */
+  --accent-indigo-soft: #e0e7ff; /* selected-state backgrounds */
+
+  /* Semantic / error (unchanged role, new light-mode values) */
+  --accent-error: #dc2626;
+  --accent-error-soft: #fee2e2;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+.workspace-container, .sidebar, .table-view {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
 }

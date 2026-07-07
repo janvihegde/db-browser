@@ -249,35 +249,30 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   ];
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+    <div className="workspace-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '20px', backgroundColor: 'var(--bg-page)' }}>
 
       {/* Header Area */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={onBack}
-          style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: 0, marginBottom: '12px', fontSize: '0.9rem' }}
-        >
-          ← Back to Tables
-        </button>
+        <button onClick={onBack} className="btn-back">← Back to Tables</button>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-          <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 300, color: '#ffffff' }}>{table}</h2>
+          <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 500, color: 'var(--text-primary)' }}>{table}</h2>
           {rowCount !== null && (
-            <span style={{ color: '#a3a3a3', fontSize: '1.1rem', backgroundColor: '#171717', padding: '4px 12px', borderRadius: '16px', border: '1px solid #262626' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', backgroundColor: 'var(--bg-surface)', padding: '4px 12px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               {Number(rowCount).toLocaleString()} Rows
             </span>
           )}
         </div>
-      </div>
+        </div>
 
       {/* Tabs */}
       <Tabs
         value={activeTab}
         onChange={(e, newValue) => setActiveTab(newValue)}
         sx={{
-          minHeight: '40px', mb: 3, borderBottom: '1px solid #262626',
-          '& .MuiTab-root': { color: '#a3a3a3', textTransform: 'none', fontSize: '1rem' },
-          '& .Mui-selected': { color: '#ffffff !important' },
-          '& .MuiTabs-indicator': { backgroundColor: '#3b82f6' }
+          minHeight: '40px', mb: 3, borderBottom: '1px solid var(--border-color)',
+          '& .MuiTab-root': { color: 'var(--text-secondary)', textTransform: 'none', fontSize: '1rem', fontWeight: 500 },
+          '& .Mui-selected': { color: 'var(--text-primary) !important' },
+          '& .MuiTabs-indicator': { backgroundColor: 'var(--accent-indigo)' }
         }}
       >
         <Tab label="Data Preview" />
@@ -286,28 +281,27 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
         <Tab label="ER Diagram" />
         <Tab label="Visual Builder" />
       </Tabs>
-
       {/* Tab Content Area */}
-      <div style={{ flexGrow: 1, backgroundColor: '#000000', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ flexGrow: 1, backgroundColor: 'var(--bg-page)', borderRadius: '8px', overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-            <CircularProgress size={32} sx={{ color: '#3b82f6' }} />
+            <CircularProgress size={32} sx={{ color: 'var(--accent-indigo)' }} />
           </div>
         ) : activeTab === 0 ? (
-          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%', border: '1px solid #262626', borderRadius: '8px' }}>
+          <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
             <AgGridReact rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
           </div>
         ) : activeTab === 1 ? (
-          <div className="ag-theme-alpine-dark" style={{ height: '100%', width: '100%', border: '1px solid #262626', borderRadius: '8px' }}>
+          <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
             <AgGridReact rowData={columnsData} columnDefs={metaColumnDefs} pagination={true} paginationPageSize={100} />
           </div>
         ) : activeTab === 2 ? (
           /* Tab 2: SQL Editor with History Sidebar */
-          <div style={{ display: 'flex', height: '100%', backgroundColor: '#000000' }}>
+          <div style={{ display: 'flex', height: '100%', backgroundColor: 'var(--bg-page)' }}>
 
             {/* Left: Query History Sidebar */}
-            <div style={{ width: '250px', borderRight: '1px solid #262626', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
-              <div style={{ padding: '16px', borderBottom: '1px solid #262626', fontSize: '0.9rem', color: '#e5e5e5', fontWeight: 600 }}>
+            <div style={{ width: '250px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
+              <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 600 }}>
                 Query History
               </div>
               <div style={{ flexGrow: 1, overflowY: 'auto' }}>
@@ -319,8 +313,8 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
             <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, padding: '20px', gap: '20px', overflowY: 'auto' }}>
 
               {/* Card 1: SQL Editor */}
-              <div style={{ flexShrink: 0, height: '40%', minHeight: '250px', backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                <div style={{ padding: '8px 16px', backgroundColor: '#111111', borderBottom: '1px solid #262626', fontSize: '0.75rem', fontWeight: 600, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+              <div style={{ flexShrink: 0, height: '40%', minHeight: '250px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
+                <div style={{ padding: '8px 16px', backgroundColor: 'var(--bg-page)', borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
                   Query Editor
                 </div>
 
@@ -329,7 +323,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
                   <Editor
                     height="100%"
                     defaultLanguage="sql"
-                    theme="vs-dark"
+                    theme="light"
                     value={sqlQuery}
                     onChange={(value) => setSqlQuery(value)}
                     options={{
@@ -344,38 +338,93 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
               </div>
 
               {/* Card 2: Action Buttons */}
-              <div style={{ flexShrink: 0, padding: '16px 24px', backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                <button onClick={handleRunQuery} disabled={isExecuting} style={{ backgroundColor: isExecuting ? '#1e3a8a' : '#2563eb', color: '#ffffff', border: 'none', padding: '10px 24px', borderRadius: '6px', cursor: isExecuting ? 'not-allowed' : 'pointer', fontWeight: 600, transition: 'background-color 0.2s' }}>
+              <div style={{ flexShrink: 0, padding: '16px 24px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
+                <button
+                  onClick={handleRunQuery}
+                  disabled={isExecuting}
+                  style={{
+                    backgroundColor: isExecuting ? 'var(--border-color)' : 'var(--accent-teal)',
+                    color: isExecuting ? 'var(--text-secondary)' : '#ffffff',
+                    border: 'none',
+                    padding: '10px 24px',
+                    borderRadius: '6px',
+                    cursor: isExecuting ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    transition: 'background-color 0.2s'
+                  }}
+                >
                   {isExecuting ? 'Executing...' : '▶ Run Query'}
                 </button>
 
-                <button onClick={handleExplainQuery} disabled={isExecuting} style={{ backgroundColor: '#4c1d95', color: '#ffffff', border: '1px solid #7c3aed', padding: '9px 20px', borderRadius: '6px', cursor: isExecuting ? 'not-allowed' : 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
+                <button
+                  onClick={handleExplainQuery}
+                  disabled={isExecuting}
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--accent-indigo)',
+                    border: '1px solid var(--accent-indigo)',
+                    padding: '9px 20px',
+                    borderRadius: '6px',
+                    cursor: isExecuting ? 'not-allowed' : 'pointer',
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                >
                   ⚡ Explain Plan
                 </button>
 
-
-                <button onClick={handleExportCSV} disabled={queryResults.length === 0} style={{ backgroundColor: queryResults.length === 0 ? '#171717' : '#059669', color: queryResults.length === 0 ? '#525252' : '#ffffff', border: '1px solid', borderColor: queryResults.length === 0 ? '#262626' : '#059669', padding: '9px 20px', borderRadius: '6px', cursor: queryResults.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
+                <button
+                  onClick={handleExportCSV}
+                  disabled={queryResults.length === 0}
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: queryResults.length === 0 ? 'var(--text-secondary)' : 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    padding: '9px 20px',
+                    borderRadius: '6px',
+                    cursor: queryResults.length === 0 ? 'not-allowed' : 'pointer',
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                >
                   ↓ Download CSV
+                </button>
+
+                <button
+                  onClick={handleSaveQuery}
+                  disabled={isSaving}
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-color)',
+                    padding: '9px 20px',
+                    borderRadius: '6px',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {isSaving ? 'Saving...' : '💾 Save Query'}
                 </button>
               </div>
 
               {/* Card 3: Results Grid OR Explain Plan Output */}
-              <div className="ag-theme-alpine-dark" style={{ flexShrink: 0, height: '400px', width: '100%', position: 'relative', border: '1px solid #262626', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+              <div className="ag-theme-alpine" style={{ flexShrink: 0, height: '400px', width: '100%', position: 'relative', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
                 {explainPlan ? (
-                  <div style={{ padding: '24px', backgroundColor: '#0a0a0a', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '24px', backgroundColor: 'var(--bg-surface)', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                      <span style={{ color: '#a855f7', fontWeight: 600, fontSize: '1.2rem' }}>Query Execution Explained</span>
-                      <button onClick={() => setExplainPlan(null)} style={{ background: '#262626', border: 'none', color: '#e5e5e5', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>✕ Close</button>
+                      <span style={{ color: 'var(--accent-indigo)', fontWeight: 600, fontSize: '1.2rem' }}>Query Execution Explained</span>
+                      <button onClick={() => setExplainPlan(null)} style={{ background: 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>✕ Close</button>
                     </div>
 
-                    <div style={{ padding: '20px', backgroundColor: '#171717', border: '1px solid #7c3aed', borderRadius: '8px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ padding: '20px', backgroundColor: 'var(--bg-page)', border: '1px solid var(--accent-indigo)', borderRadius: '8px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {simplifyExplainPlan(explainPlan).map((step, idx) => (
-                        <div key={idx} style={{ color: '#e5e5e5', fontSize: '1.05rem', lineHeight: '1.6' }}>{step}</div>
+                        <div key={idx} style={{ color: 'var(--text-primary)', fontSize: '1.05rem', lineHeight: '1.6' }}>{step}</div>
                       ))}
                     </div>
 
-                    <span style={{ color: '#525252', fontSize: '0.8rem', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raw Postgres Output</span>
-                    <pre style={{ margin: 0, padding: '16px', backgroundColor: '#000', border: '1px solid #262626', borderRadius: '6px', color: '#a3a3a3', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', lineHeight: '1.5' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raw Postgres Output</span>
+                    <pre style={{ margin: 0, padding: '16px', backgroundColor: 'var(--bg-page)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '12px', overflowX: 'auto', lineHeight: '1.5' }}>
                       {explainPlan}
                     </pre>
                   </div>
@@ -386,13 +435,13 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
             </div>
           </div>
         ) : activeTab === 3 ? (
-          <div style={{ border: '1px solid #262626', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
+          <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
             <ERDiagram />
           </div>
-        
+
         ) : (
   /* activeTab === 4: Visual Query Builder */
-  <div style={{ border: '1px solid #262626', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
+  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', height: '100%', overflow: 'hidden' }}>
     <VisualQueryBuilder
       onGenerateSql={(sql) => {
         setSqlQuery(sql);
