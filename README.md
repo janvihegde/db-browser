@@ -1,91 +1,99 @@
-# 🐘 DB-Browser: Advanced PostgreSQL Visual Client
+# Database Browser
 
-DB-Browser is a full-stack, web-based PostgreSQL database administration and visual analytics tool. Built to connect seamlessly to cloud databases (like AWS RDS), it provides a modern, dark-themed interface for exploring schemas, writing SQL, generating automated entity-relationship diagrams, and visually building complex queries without writing code.
-
-## 🚀 Tech Stack
-
-**Frontend:**
-* **React (Vite):** Core UI framework.
-* **AG Grid:** High-performance data tables for results and metadata.
-* **Monaco Editor:** VS Code's underlying editor for the SQL text environment.
-* **Mermaid.js:** Diagramming and charting tool for automated ER diagram generation.
-* **Material UI (MUI):** Tab navigation and loading states.
-* **HTML5 Drag & Drop API:** Native drag-and-drop for the visual query builder.
-
-**Backend:**
-* **Node.js & Express:** REST API server.
-* **PostgreSQL (`pg`):** Native Postgres client for executing queries.
-* **json2csv:** Utility for converting JSON database payloads into downloadable CSV files.
+A highly professional, secure, and user-friendly web application designed for seamless PostgreSQL database exploration, SQL query execution, and visual data management.
 
 ---
 
-## ✨ Core Features & Architecture
+## 🚀 Key Features
 
-### 1. Database Explorer (Sidebar Navigation)
-* **Dynamic Hierarchy:** Automatically queries the database to list all available Schemas (`public`, etc.) and their respective Base Tables.
-* **State Management:** Clicking a table dynamically updates the main workspace, fetching fresh data and metadata.
+### 1. Database & Schema Discovery
 
-### 2. Multi-Tab Workspace (`TableWorkspace.jsx`)
-The main workspace is divided into 5 distinct modules:
+* **Smart Database Listing:** Dynamically retrieves all available databases in your PostgreSQL cluster. It uses logic-based filtering (`pg_roles` and `pg_database` metadata) to automatically hide system databases (like `rdsadmin` or `postgres`), ensuring users only see relevant user-created databases.
+* **Hierarchical Navigation:** Navigate easily through database schemas and table structures.
 
-#### Tab 1: Data Preview
-* Executes a `SELECT * LIMIT 100` upon table selection.
-* Renders data into a fully interactive AG Grid, supporting out-of-the-box column sorting, filtering, and resizing.
+### 2. Intelligent Data Exploration
 
-#### Tab 2: Columns (Metadata)
-* Queries the `information_schema.columns` view.
-* Displays critical table structure information including `column_name`, `data_type`, and `is_nullable`.
+* **Preview & Metadata:** View raw data previews using a high-performance `AG-Grid` interface. Access deep metadata including data types, nullability, and primary/foreign key constraints.
+* **Performance Insights:** - **Row Count Badges:** Fast, non-blocking estimation of row counts for every table.
+* **Statistics Dashboard:** Get a bird's-eye view of your database health, including total size, object counts (tables, views, functions), and identification of the top 5 largest tables.
 
-#### Tab 3: Advanced SQL Editor & History
-* **Monaco Integration:** Provides syntax highlighting, line numbers, and a premium coding experience.
-* **Query Execution:** Securely passes raw SQL to the backend, rendering dynamic result grids.
-* **Query Execution Plan:** Includes an **"Explain Plan"** feature that prepends `EXPLAIN ANALYZE` to the user's query, intercepting the database's internal execution path and rendering the raw performance metrics.
-* **Intelligent Query History:** A client-side, in-memory search index that tracks past queries. It features an intent-aware summarization engine (e.g., dynamically labeling queries as *"Merging orders with reference records"* or *"Aggregating users data"*) rather than just showing raw SQL.
-* **CSV Export:** A one-click download feature that pipes the current query results through the backend into a `.csv` file.
 
-#### Tab 4: Automated ER Diagrams (`ERDiagram.jsx`)
-* **Dynamic Generation:** Queries `pg_constraint` and `information_schema` to detect all live Foreign Key relationships in the database.
-* **Visual Rendering:** Translates the SQL metadata into Mermaid.js syntax, rendering an interactive, zoomable Entity-Relationship Diagram of the database architecture.
 
-#### Tab 5: Visual Query Builder (`VisualQueryBuilder.jsx`)
-A zero-dependency, drag-and-drop query constructor featuring:
-* **Live Database Sync:** Fetches actual tables from the database for the drag-and-drop sidebar.
-* **Mode Switching:** Toggles between `SELECT` (Analytics) and `INSERT` (Data Entry) modes.
-* **Drag-and-Drop Canvas:** Drop tables onto the workspace to begin building.
-* **Join Engine:** Visually configure `INNER`, `LEFT`, and `RIGHT` joins based on the dropped tables.
-* **PostgreSQL Functions:** Apply Aggregates (`COUNT`, `SUM`), String formatting (`UPPER`), Math (`ROUND`), and Date extraction directly to columns.
-* **Auto Group-By Intelligence:** Automatically detects when aggregate functions are mixed with standard columns and generates the required `GROUP BY` SQL clause.
-* **WHERE Filter Builder:** Chain `AND/OR` logical filters with various operators (`=`, `>`, `LIKE`, `IS NULL`).
-* **Dynamic Forms:** In `INSERT` mode, instantly generates a data-entry form matching the columns of the selected table.
+### 3. Advanced SQL IDE
+
+* **Monaco-powered Editor:** A full-featured SQL editor (same engine as VS Code) with syntax highlighting and formatting.
+* **Query Execution:** Secure execution of arbitrary SQL with strict `60s` statement timeouts to prevent system hang-ups.
+* **Explain Plan Translation:** A built-in "Explain Plan" feature that translates complex Postgres `EXPLAIN ANALYZE` outputs into plain, actionable English (e.g., identifying sequential scans versus index scans).
+* **History Tracking:** Automatically logs query execution to a central history table, allowing users to scroll back and re-run previous work.
+* **Data Export:** Built-in ability to export any query's results directly to a formatted CSV file.
+
+### 4. Visual Query Builder
+
+* **Drag-and-Drop Interface:** A sophisticated visual builder that translates intuitive query-building actions into valid SQL, bridging the gap between non-technical users and complex database interactions.
 
 ---
 
-## 📁 Project Structure
+## 🏗️ Technical Architecture
 
-```text
-db-browser/
-│
-├── backend/                  # Node.js Express Server
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── db.js         # PostgreSQL connection pool (AWS RDS SSL enabled)
-│   │   ├── routes/
-│   │   │   └── databaseRoutes.js # Core API endpoints (Query, Export, Metadata)
-│   │   └── server.js         # Express initialization
-│   ├── .env                  # DB Credentials
-│   └── package.json
-│
-└── db-browser-frontend/      # React (Vite) Application
-    ├── src/
-    │   ├── components/
-    │   │   ├── Sidebar.jsx           # Navigational tree
-    │   │   ├── TableWorkspace.jsx    # Main tabbed interface
-    │   │   ├── QueryHistoryList.jsx  # Intent-aware history panel
-    │   │   ├── ERDiagram.jsx         # Mermaid visualization
-    │   │   └── VisualQueryBuilder.jsx# Drag-and-drop SQL engine
-    │   ├── services/
-    │   │   └── api.js                # Axios configuration
-    │   ├── App.jsx                   # Layout container
-    │   ├── index.css                 # Global dark-theme overrides
-    │   └── main.jsx
-    └── package.json
+The application adheres to a secure **three-tier architecture**:
+
+1. **Frontend (React + Vite):**
+* Manages the state and provides a responsive UI.
+* Communicates with the backend using a shared `api` service (Axios-based).
+
+
+2. **Backend (Node.js + Express):**
+* **Authentication Middleware:** Every request is authenticated using `requireAuth`.
+* **Route Handling:** Routes are strictly separated into `authRoutes`, `databaseRoutes`, and `queryHistory`.
+* **Connection Pooling:** Utilizes the `pg` (node-postgres) library with a robust connection pool to handle multiple concurrent users safely.
+
+
+3. **Database Layer (PostgreSQL):**
+* Uses system metadata (`information_schema` and `pg_catalog`) to power the "browser" features without requiring manual configuration.
+
+
+
+---
+
+## 📁 Codebase Structure
+
+### `backend/`
+
+* `src/server.js`: The central entry point. Registers routes and global security middleware (CORS, Cookie-Parser).
+* `src/routes/databaseRoutes.js`: Contains all logic for metadata discovery, stats, and SQL query execution.
+* `src/middleware/auth.js`: Implements Role-Based Access Control (RBAC).
+
+### `db-browser-frontend/`
+
+* `src/components/TableWorkspace.jsx`: The main interactive component that orchestrates tabs, SQL editor integration, and data viewing.
+* `src/services/api.js`: Centralized Axios configuration for handling API calls and JWT tokens.
+* `src/utils/sqlTranslator.js`: Logic for parsing PostgreSQL performance plans into human-readable text.
+
+---
+
+## ⚙️ Installation & Setup
+
+1. **Clone the repository:**
+```bash
+git clone <your-repo-url>
+
+```
+
+
+2. **Backend Setup:**
+* Navigate to `/backend`.
+* Run `npm install` to fetch dependencies.
+* Set up your `.env` file (ensure `DATABASE_URL` and `JWT_SECRET` are set).
+* Start the server: `npm start`.
+
+
+3. **Frontend Setup:**
+* Navigate to `/db-browser-frontend`.
+* Run `npm install`.
+* Start the development server: `npm run dev`.
+
+
+
+---
+
+*Built for database agility and developer productivity.*
