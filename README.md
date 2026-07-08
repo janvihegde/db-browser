@@ -1,99 +1,178 @@
-# Database Browser
-
-A highly professional, secure, and user-friendly web application designed for seamless PostgreSQL database exploration, SQL query execution, and visual data management.
+Here is a highly detailed, professional `README.md` based on the architecture, dependencies, and structure of your `db-browser` project.
 
 ---
 
-## 🚀 Key Features
+# 🗄️ DB Browser (PostgreSQL Workspace)
 
-### 1. Database & Schema Discovery
+A full-stack, high-performance web application designed to securely connect, browse, and manage PostgreSQL databases. Built with a Node.js/Express backend and a modern React (Vite) frontend, this application provides an interactive workspace for database administrators and developers to query data, manage tables, translate natural language to SQL, and export records effortlessly.
 
-* **Smart Database Listing:** Dynamically retrieves all available databases in your PostgreSQL cluster. It uses logic-based filtering (`pg_roles` and `pg_database` metadata) to automatically hide system databases (like `rdsadmin` or `postgres`), ensuring users only see relevant user-created databases.
-* **Hierarchical Navigation:** Navigate easily through database schemas and table structures.
+## ✨ Core Features
 
-### 2. Intelligent Data Exploration
-
-* **Preview & Metadata:** View raw data previews using a high-performance `AG-Grid` interface. Access deep metadata including data types, nullability, and primary/foreign key constraints.
-* **Performance Insights:** - **Row Count Badges:** Fast, non-blocking estimation of row counts for every table.
-* **Statistics Dashboard:** Get a bird's-eye view of your database health, including total size, object counts (tables, views, functions), and identification of the top 5 largest tables.
-
-
-
-### 3. Advanced SQL IDE
-
-* **Monaco-powered Editor:** A full-featured SQL editor (same engine as VS Code) with syntax highlighting and formatting.
-* **Query Execution:** Secure execution of arbitrary SQL with strict `60s` statement timeouts to prevent system hang-ups.
-* **Explain Plan Translation:** A built-in "Explain Plan" feature that translates complex Postgres `EXPLAIN ANALYZE` outputs into plain, actionable English (e.g., identifying sequential scans versus index scans).
-* **History Tracking:** Automatically logs query execution to a central history table, allowing users to scroll back and re-run previous work.
-* **Data Export:** Built-in ability to export any query's results directly to a formatted CSV file.
-
-### 4. Visual Query Builder
-
-* **Drag-and-Drop Interface:** A sophisticated visual builder that translates intuitive query-building actions into valid SQL, bridging the gap between non-technical users and complex database interactions.
+* **Secure Authentication:** Route protection and user verification powered by JSON Web Tokens (JWT) and Bcrypt password hashing.
+* **Tabbed Table Workspace:** A dynamic, multi-tab interface built with Material-UI (MUI) to view multiple tables or query results simultaneously without losing context.
+* **High-Performance Data Grid:** Integrates `AG Grid` (`ag-grid-react`) for rapid rendering, sorting, and filtering of large database query results.
+* **Natural Language to SQL:** A dedicated `sqlTranslator.js` module that parses user intents and translates them into executable SQL statements.
+* **Data Export:** One-click functionality to convert database views into downloadable CSV files utilizing the backend `json2csv` engine.
+* **Robust Database Connectivity:** Direct integration with PostgreSQL via the `pg` (node-postgres) module, supporting connection pooling and complex data types.
 
 ---
 
-## 🏗️ Technical Architecture
+## 🛠️ Technology Stack
 
-The application adheres to a secure **three-tier architecture**:
+### **Frontend**
 
-1. **Frontend (React + Vite):**
-* Manages the state and provides a responsive UI.
-* Communicates with the backend using a shared `api` service (Axios-based).
+* **Framework:** React 18 (Bootstrapped with Vite for optimized HMR and builds)
+* **UI Library:** Material-UI (@mui/material)
+* **Data Tables:** AG Grid React
+* **Styling:** CSS / MUI Emotion
 
+### **Backend**
 
-2. **Backend (Node.js + Express):**
-* **Authentication Middleware:** Every request is authenticated using `requireAuth`.
-* **Route Handling:** Routes are strictly separated into `authRoutes`, `databaseRoutes`, and `queryHistory`.
-* **Connection Pooling:** Utilizes the `pg` (node-postgres) library with a robust connection pool to handle multiple concurrent users safely.
-
-
-3. **Database Layer (PostgreSQL):**
-* Uses system metadata (`information_schema` and `pg_catalog`) to power the "browser" features without requiring manual configuration.
-
-
+* **Runtime:** Node.js
+* **Framework:** Express.js
+* **Database Driver:** PostgreSQL (`pg`, `pg-pool`)
+* **Security & Auth:** `jsonwebtoken`, `bcrypt`, `cors`
+* **Utilities:** `json2csv` (Export), `dotenv` (Environment management), `body-parser`
 
 ---
 
-## 📁 Codebase Structure
+## 📁 Project Structure
 
-### `backend/`
-
-* `src/server.js`: The central entry point. Registers routes and global security middleware (CORS, Cookie-Parser).
-* `src/routes/databaseRoutes.js`: Contains all logic for metadata discovery, stats, and SQL query execution.
-* `src/middleware/auth.js`: Implements Role-Based Access Control (RBAC).
-
-### `db-browser-frontend/`
-
-* `src/components/TableWorkspace.jsx`: The main interactive component that orchestrates tabs, SQL editor integration, and data viewing.
-* `src/services/api.js`: Centralized Axios configuration for handling API calls and JWT tokens.
-* `src/utils/sqlTranslator.js`: Logic for parsing PostgreSQL performance plans into human-readable text.
-
----
-
-## ⚙️ Installation & Setup
-
-1. **Clone the repository:**
-```bash
-git clone <your-repo-url>
+```text
+db-browser/
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── db.js               # PostgreSQL connection & pool config
+│   │   ├── middleware/
+│   │   │   └── auth.js             # JWT verification and route protection
+│   │   ├── routes/
+│   │   │   ├── authRoutes.js       # Login, register, and token refresh logic
+│   │   │   └── databaseRoutes.js   # DB querying, table fetching, and CSV export
+│   │   └── server.js               # Express application entry point
+│   ├── setUser.js                  # User seeding/management utility
+│   ├── .env                        # Backend environment variables
+│   └── package.json                
+│
+└── db-browser-frontend/
+    ├── public/                     # Static assets (favicons, icons)
+    ├── src/
+    │   ├── assets/                 # SVGs and images (hero.png, react.svg)
+    │   ├── components/
+    │   │   ├── Login.jsx           # User authentication interface
+    │   │   ├── Sidebar.jsx         # Database schema and table navigation
+    │   │   ├── TableWorkspace.jsx  # AG Grid tabbed workspace for query results
+    │   │   └── Toast.jsx           # MUI snackbar alerts for user feedback
+    │   ├── services/
+    │   │   └── api.js              # Axios/Fetch wrappers for backend communication
+    │   ├── utils/
+    │   │   └── sqlTranslator.js    # Natural language to SQL translation logic
+    │   ├── App.jsx                 # Main React component and state routing
+    │   ├── main.jsx                # React DOM render entry
+    │   └── index.css               # Global styles
+    ├── vite.config.js              # Vite bundler configuration
+    └── package.json                
 
 ```
 
+---
 
-2. **Backend Setup:**
-* Navigate to `/backend`.
-* Run `npm install` to fetch dependencies.
-* Set up your `.env` file (ensure `DATABASE_URL` and `JWT_SECRET` are set).
-* Start the server: `npm start`.
+## 🚀 Getting Started
 
+### Prerequisites
 
-3. **Frontend Setup:**
-* Navigate to `/db-browser-frontend`.
-* Run `npm install`.
-* Start the development server: `npm run dev`.
+Before you begin, ensure you have the following installed on your machine:
 
+* [Node.js](https://nodejs.org/en/) (v16.x or higher recommended)
+* [PostgreSQL](https://www.postgresql.org/) (Running locally or hosted)
+* [Git](https://git-scm.com/)
 
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/db-browser.git
+cd db-browser
+
+```
+
+### 2. Backend Setup
+
+Navigate to the backend directory, install dependencies, and configure your environment.
+
+```bash
+cd backend
+npm install
+
+```
+
+**Create a `.env` file in the `backend` directory:**
+
+```env
+# Server Configuration
+PORT=5000
+
+# PostgreSQL Database Credentials
+DB_USER=your_postgres_user
+DB_PASSWORD=your_postgres_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=your_target_database
+
+# Authentication
+JWT_SECRET=your_super_secret_jwt_key
+
+```
+
+*Optional:* If you need to establish initial users, run the setup script:
+
+```bash
+node setUser.js
+
+```
+
+**Start the Backend Server:**
+
+```bash
+# For development
+npm run dev
+# OR
+node src/server.js
+
+```
+
+### 3. Frontend Setup
+
+Open a new terminal window/tab, navigate to the frontend directory, and install the dependencies.
+
+```bash
+cd db-browser-frontend
+npm install
+
+```
+
+**Start the Frontend Development Server:**
+
+```bash
+npm run dev
+
+```
+
+The Vite server will typically launch on `http://localhost:5173`.
 
 ---
 
-*Built for database agility and developer productivity.*
+## 💡 Usage Guide
+
+1. **Authentication:** Upon loading the app, enter your credentials in the `Login` view. The backend will validate via Bcrypt and return a JWT.
+2. **Navigation:** Use the `Sidebar` to view the active PostgreSQL schema. Click on tables to spawn a new workspace tab.
+3. **Viewing Data:** The `TableWorkspace` uses AG Grid. You can drag columns to rearrange, use column headers to filter records, and click headers to sort.
+4. **SQL Translation:** Enter natural language queries into the input field; the `sqlTranslator.js` utility will convert your request into a valid SQL string and fetch the results.
+5. **Export:** Click the export button within a workspace tab to trigger the backend `json2csv` pipeline, instantly downloading your current view as a CSV file.
+
+---
+
+## 🛡️ Security Considerations
+
+* **Never commit `.env` files.** The `.gitignore` is already configured to prevent this.
+* **JWT Expiration:** Ensure tokens have a reasonable expiration time set in `authRoutes.js`.
+* **SQL Injection:** Ensure the backend `databaseRoutes.js` strictly utilizes parameterized queries (`pg` module's `$1, $2` syntax) rather than string concatenation, especially when parsing outputs from the `sqlTranslator`.
