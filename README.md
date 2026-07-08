@@ -1,6 +1,4 @@
-Here is a highly detailed, professional `README.md` based on the architecture, dependencies, and structure of your `db-browser` project.
 
----
 
 # 🗄️ DB Browser (PostgreSQL Workspace)
 
