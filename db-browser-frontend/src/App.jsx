@@ -106,6 +106,7 @@ function App() {
           onSelectDb={setSelectedDb} 
           selectedSchema={selectedSchema}
           onSelectSchema={setSelectedSchema}
+          onSelectTable={setSelectedTable}
         />
         
         <main style={{ padding: '60px', flexGrow: 1, backgroundColor: 'var(--bg-main)', overflowY: 'auto' }}>

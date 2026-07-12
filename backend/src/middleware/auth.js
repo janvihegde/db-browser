@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
 
+// Fail fast in production if a real secret isn't configured — silently
+// falling back to a hardcoded value would let anyone forge valid tokens.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be set in production. Generate one with: openssl rand -base64 32');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_dev_key';
 
 // Middleware 1: Verify JWT

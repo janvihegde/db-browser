@@ -15,14 +15,19 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // 3. Setup Global Middleware
+// CORS_ORIGIN must be set in production (e.g. your Vercel URL). Falling back
+// to localhost keeps local dev working without code changes.
 app.use(cors({
-    origin: 'http://localhost:5173', 
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser());
 
 // 4. Register Routes
+// Health check for Render's readiness/liveness probes — no auth required.
+app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }));
+
 // Fixed: Removed extra spaces in the path
 app.use('/api/auth', authRoutes);
 

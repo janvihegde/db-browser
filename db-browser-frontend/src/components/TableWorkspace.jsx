@@ -17,6 +17,9 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   // Columns Metadata State
   const [columnsData, setColumnsData] = useState([]);
 
+  // Relationships State
+  const [relationships, setRelationships] = useState({ outgoing: [], incoming: [] });
+
   // SQL Editor State
   const [sqlQuery, setSqlQuery] = useState(`SELECT * FROM "${schema}"."${table}" LIMIT 100;`);
   const [queryResults, setQueryResults] = useState([]);
@@ -27,20 +30,25 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [rowCount, setRowCount] = useState(null);
 
+  // Base path for all routes scoped to this database/schema/table
+  const tableBasePath = `/database/${db}/schemas/${schema}/tables/${table}`;
+
   // Fetch row count whenever the table changes
   useEffect(() => {
-    if (!table) return;
+    if (!db || !schema || !table) return;
     setRowCount(null);
-    api.get(`/database/table/${table}/count`)
+    api.get(`${tableBasePath}/count`)
       .then(res => setRowCount(res.data.rowCount))
       .catch(err => console.error("Failed to fetch count:", err));
-  }, [table]);
+  }, [db, schema, table]);
 
-  // Fetch data when switching to Preview or Columns tabs
+  // Fetch data when switching tabs
   useEffect(() => {
+    if (!db || !schema || !table) return;
+
     if (activeTab === 0) {
       setIsLoading(true);
-      api.get(`/database/${schema}/${table}/preview`)
+      api.get(`${tableBasePath}/preview`)
         .then(response => {
           let data = [];
           if (Array.isArray(response.data)) data = response.data;
@@ -62,7 +70,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
 
     } else if (activeTab === 1) {
       setIsLoading(true);
-      api.get(`/database/table/${table}/columns`)
+      api.get(`${tableBasePath}/columns`)
         .then(response => {
           let colsData = [];
           if (Array.isArray(response.data)) colsData = response.data;
@@ -72,6 +80,18 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
           setColumnsData(colsData);
         })
         .catch(err => console.error("Failed to fetch columns:", err))
+        .finally(() => setIsLoading(false));
+
+    } else if (activeTab === 2) {
+      setIsLoading(true);
+      api.get(`${tableBasePath}/relationships`)
+        .then(response => {
+          setRelationships({
+            outgoing: response.data.outgoing || [],
+            incoming: response.data.incoming || []
+          });
+        })
+        .catch(err => console.error("Failed to fetch relationships:", err))
         .finally(() => setIsLoading(false));
     }
   }, [db, schema, table, activeTab]);
@@ -84,7 +104,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     setQueryError(null);
 
     try {
-      const response = await api.post('/database/query', { sql: sqlQuery });
+      const response = await api.post(`/database/${db}/query`, { sql: sqlQuery });
 
       let data = [];
       if (Array.isArray(response.data)) data = response.data;
@@ -115,7 +135,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     if (!sqlQuery.trim()) return;
     const encodedQuery = encodeURIComponent(sqlQuery);
     const base = api.defaults.baseURL || '';
-    const exportUrl = `${base}/database/query/export?sql=${encodedQuery}`;
+    const exportUrl = `${base}/database/${db}/query/export?sql=${encodedQuery}`;
     window.open(exportUrl, '_blank');
   };
 
@@ -127,6 +147,14 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     { field: 'is_nullable', headerName: 'Nullable', width: 120, sortable: true, filter: true },
     { field: 'column_default', headerName: 'Default Value', flex: 1, sortable: true, filter: true },
   ];
+
+  const relationshipCardStyle = {
+    padding: '16px 20px',
+    backgroundColor: 'var(--bg-surface)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '8px',
+    marginBottom: '12px'
+  };
 
   return (
     <div className="workspace-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '20px', backgroundColor: 'var(--bg-page)' }}>
@@ -157,28 +185,67 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
       >
         <Tab label="Data Preview" />
         <Tab label="Columns" />
+        <Tab label="Relationships" />
         <Tab label="SQL Editor" />
       </Tabs>
 
       {/* Tab Content Area */}
-      <div style={{ flexGrow: 1, backgroundColor: 'var(--bg-page)', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ flexGrow: 1, backgroundColor: 'var(--bg-page)', borderRadius: '8px', overflow: 'auto' }}>
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress size={32} sx={{ color: 'var(--accent-indigo)' }} />
           </div>
         ) : activeTab === 0 ? (
           <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-            <AgGridReact rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
+            <AgGridReact theme="legacy" rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
           </div>
         ) : activeTab === 1 ? (
           <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-            <AgGridReact rowData={columnsData} columnDefs={metaColumnDefs} pagination={true} paginationPageSize={100} />
+            <AgGridReact theme="legacy" rowData={columnsData} columnDefs={metaColumnDefs} pagination={true} paginationPageSize={100} />
           </div>
-        ) : activeTab === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '20px' }}>
-            
-            {/* Card 1: SQL Editor */}
-            <div style={{ flexShrink: 0, height: '40%', minHeight: '250px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
+        ) : activeTab === 2 ? (
+          <div style={{ height: '100%', overflowY: 'auto', padding: '4px' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '12px' }}>
+                This table references ({relationships.outgoing.length})
+              </h4>
+              {relationships.outgoing.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>No outgoing foreign keys.</p>
+              ) : (
+                relationships.outgoing.map((fk, i) => (
+                  <div key={i} style={relationshipCardStyle}>
+                    <strong>{table}.{fk.column_name}</strong>
+                    <span style={{ color: 'var(--text-secondary)' }}> → </span>
+                    <strong>{fk.referenced_schema}.{fk.referenced_table}.{fk.referenced_column}</strong>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div>
+              <h4 style={{ color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '12px' }}>
+                Referenced by ({relationships.incoming.length})
+              </h4>
+              {relationships.incoming.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>No incoming foreign keys.</p>
+              ) : (
+                relationships.incoming.map((fk, i) => (
+                  <div key={i} style={relationshipCardStyle}>
+                    <strong>{fk.referencing_schema}.{fk.referencing_table}.{fk.referencing_column}</strong>
+                    <span style={{ color: 'var(--text-secondary)' }}> → </span>
+                    <strong>{table}.{fk.referenced_column}</strong>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : activeTab === 3 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '20px' }}>
+
+            {/* Card 1: SQL Editor — fixed height so it doesn't depend on a
+                percentage of a variable-height ancestor; scrolls with the
+                page instead of being squeezed to fit the viewport */}
+            <div style={{ height: '300px', flexShrink: 0, backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
               <div style={{ padding: '8px 16px', backgroundColor: 'var(--bg-page)', borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
                 Query Editor
               </div>
@@ -237,9 +304,12 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
               </button>
             </div>
 
-            {/* Card 3: Results Grid */}
-            <div className="ag-theme-alpine" style={{ flexGrow: 1, minHeight: '300px', width: '100%', position: 'relative', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
-              <AgGridReact rowData={queryResults} columnDefs={queryColumnDefs} pagination={true} paginationPageSize={100} />
+            {/* Card 3: Results Grid — fixed height, same reasoning as Card 1.
+                AG Grid handles its own internal row scrolling/pagination
+                within this box; the page itself scrolls around the whole
+                tab if editor + buttons + grid together exceed the viewport. */}
+            <div className="ag-theme-alpine" style={{ height: '500px', flexShrink: 0, width: '100%', position: 'relative', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08)' }}>
+              <AgGridReact theme="legacy" rowData={queryResults} columnDefs={queryColumnDefs} pagination={true} paginationPageSize={100} />
             </div>
           </div>
         )}

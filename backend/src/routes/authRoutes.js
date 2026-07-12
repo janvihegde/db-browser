@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const pool = require('../config/db');
+const { defaultPool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_dev_key';
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM app_users WHERE email = $1', [email]);
+        const result = await defaultPool().query('SELECT * FROM app_users WHERE email = $1', [email]);
         const user = result.rows[0];
 
         if (!user || !(await bcrypt.compare(password, user.password_hash))) {
@@ -20,10 +20,16 @@ router.post('/login', async (req, res) => {
 
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
 
+        // Frontend (Vercel) and backend (Render) live on different domains,
+        // so the cookie must be sameSite: 'none' to be sent cross-site — and
+        // 'none' requires secure: true (Render gives you HTTPS by default).
+        // In local dev (NODE_ENV !== 'production') we fall back to 'lax' since
+        // 'none' without HTTPS gets rejected by browsers on http://localhost.
+        const isProd = process.env.NODE_ENV === 'production';
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: isProd,
+            sameSite: isProd ? 'none' : 'lax',
             maxAge: 8 * 60 * 60 * 1000 // 8 hours
         });
 
