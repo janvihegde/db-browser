@@ -140,6 +140,25 @@ function App() {
             />
           ) : selectedSchema ? (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
+              
+              {/* NEW: Go Back Button */}
+              <button 
+                onClick={() => setSelectedSchema(null)} 
+                style={{ 
+                  marginBottom: '16px', 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: 'var(--text-secondary)', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  fontSize: '0.9rem',
+                  padding: 0 
+                }}
+              >
+                ← Back to Schemas
+              </button>
+
               <h1 style={{ marginTop: 0, fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
                 {selectedSchema} <span style={{ color: 'var(--text-secondary)', fontSize: '1.5rem' }}>/ schema</span>
               </h1>
