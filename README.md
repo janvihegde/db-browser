@@ -1,176 +1,194 @@
+```python
+content = """# 🗄️ DB Browser
 
+A secure, web-based PostgreSQL database browser and query execution tool. 
 
-# 🗄️ DB Browser (PostgreSQL Workspace)
+DB Browser allows users to securely connect to their own PostgreSQL databases (such as AWS RDS, Supabase, or local instances), browse schemas, view table relationships, and execute SQL queries directly from the browser—all without installing desktop client software.
 
-A full-stack, high-performance web application designed to securely connect, browse, and manage PostgreSQL databases. Built with a Node.js/Express backend and a modern React (Vite) frontend, this application provides an interactive workspace for database administrators and developers to query data, manage tables, translate natural language to SQL, and export records effortlessly.
+## ✨ Key Features
 
-## ✨ Core Features
-
-* **Secure Authentication:** Route protection and user verification powered by JSON Web Tokens (JWT) and Bcrypt password hashing.
-* **Tabbed Table Workspace:** A dynamic, multi-tab interface built with Material-UI (MUI) to view multiple tables or query results simultaneously without losing context.
-* **High-Performance Data Grid:** Integrates `AG Grid` (`ag-grid-react`) for rapid rendering, sorting, and filtering of large database query results.
-* **Natural Language to SQL:** A dedicated `sqlTranslator.js` module that parses user intents and translates them into executable SQL statements.
-* **Data Export:** One-click functionality to convert database views into downloadable CSV files utilizing the backend `json2csv` engine.
-* **Robust Database Connectivity:** Direct integration with PostgreSQL via the `pg` (node-postgres) module, supporting connection pooling and complex data types.
-
----
-
-## 🛠️ Technology Stack
-
-### **Frontend**
-
-* **Framework:** React 18 (Bootstrapped with Vite for optimized HMR and builds)
-* **UI Library:** Material-UI (@mui/material)
-* **Data Tables:** AG Grid React
-* **Styling:** CSS / MUI Emotion
-
-### **Backend**
-
-* **Runtime:** Node.js
-* **Framework:** Express.js
-* **Database Driver:** PostgreSQL (`pg`, `pg-pool`)
-* **Security & Auth:** `jsonwebtoken`, `bcrypt`, `cors`
-* **Utilities:** `json2csv` (Export), `dotenv` (Environment management), `body-parser`
+* **🔒 Enterprise-Grade Security:** Database passwords are encrypted at rest using `AES-256-GCM` and only decrypted in-memory during active sessions.
+* **🎭 Role-Based Access Control (RBAC):** Built-in query enforcer that restricts execution based on user roles (Admin, Editor, Viewer). Viewers are restricted to `SELECT`/`EXPLAIN`, while Editors can perform `INSERT`/`UPDATE`/`DELETE`.
+* **🔄 Dynamic Connection Pooling:** Intelligently caches database connection pools per unique connection ID, preventing memory leaks and optimizing connection limits.
+* **📊 Visual Schema Browsing:** Easily browse databases, schemas, tables, columns, and foreign key relationships.
+* **⚡ Live SQL Execution:** Run custom SQL queries with built-in 60-second timeouts to prevent hanging transactions.
+* **📥 CSV Export:** One-click export of query results directly to CSV.
+* **📱 Frictionless Authentication:** Device-based identification (`X-Device-Id`) means no complex signup flows just to quickly check a database.
 
 ---
 
-## 📁 Project Structure
+## 🏗️ Architecture & Data Flow
+
+DB Browser operates using a "Two Database" architecture:
+1. **The Application DB:** A central PostgreSQL database that stores user profiles and the *encrypted* connection details of the target databases.
+2. **The Target DBs:** The external databases that the user actually wants to connect to and query.
+
+### Request Flow
+
+
+```
 
 ```text
-db-browser/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── db.js               # PostgreSQL connection & pool config
-│   │   ├── middleware/
-│   │   │   └── auth.js             # JWT verification and route protection
-│   │   ├── routes/
-│   │   │   ├── authRoutes.js       # Login, register, and token refresh logic
-│   │   │   └── databaseRoutes.js   # DB querying, table fetching, and CSV export
-│   │   └── server.js               # Express application entry point
-│   ├── setUser.js                  # User seeding/management utility
-│   ├── .env                        # Backend environment variables
-│   └── package.json                
-│
-└── db-browser-frontend/
-    ├── public/                     # Static assets (favicons, icons)
-    ├── src/
-    │   ├── assets/                 # SVGs and images (hero.png, react.svg)
-    │   ├── components/
-    │   │   ├── Login.jsx           # User authentication interface
-    │   │   ├── Sidebar.jsx         # Database schema and table navigation
-    │   │   ├── TableWorkspace.jsx  # AG Grid tabbed workspace for query results
-    │   │   └── Toast.jsx           # MUI snackbar alerts for user feedback
-    │   ├── services/
-    │   │   └── api.js              # Axios/Fetch wrappers for backend communication
-    │   ├── utils/
-    │   │   └── sqlTranslator.js    # Natural language to SQL translation logic
-    │   ├── App.jsx                 # Main React component and state routing
-    │   ├── main.jsx                # React DOM render entry
-    │   └── index.css               # Global styles
-    ├── vite.config.js              # Vite bundler configuration
-    └── package.json                
+README.md created successfully.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant AppDB as App Database
+    participant TargetDB as Target Postgres DB
+
+    User->>Frontend: Adds new DB Connection
+    Frontend->>Backend: POST /api/connections
+    Backend->>Backend: Encrypts DB Password (AES-256-GCM)
+    Backend->>AppDB: Stores encrypted credentials
+    AppDB-->>Backend: Confirms save
+    Backend-->>Frontend: Success
+
+    User->>Frontend: Selects Connection & Runs Query
+    Frontend->>Backend: POST /api/database/:id/query
+    Backend->>AppDB: Fetch encrypted credentials
+    Backend->>Backend: Decrypt password in memory
+    Backend->>Backend: Check RBAC (Is user allowed to run this SQL?)
+    Backend->>TargetDB: Execute SQL via dynamic cached pool
+    TargetDB-->>Backend: Query Results
+    Backend-->>Frontend: Display Results
 
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Tech Stack
+
+**Frontend:**
+
+* React (Vite)
+* Custom CSS / CSS Variables
+* Axios (API client)
+
+**Backend:**
+
+* Node.js & Express
+* PostgreSQL (`pg` library)
+* Built-in `crypto` for AES-256-GCM
+* `json2csv` for data export
+
+---
+
+## 🛠️ Getting Started (Local Development)
 
 ### Prerequisites
 
-Before you begin, ensure you have the following installed on your machine:
+* Node.js (v18+)
+* A local or cloud PostgreSQL instance (for the Application DB)
 
-* [Node.js](https://nodejs.org/en/) (v16.x or higher recommended)
-* [PostgreSQL](https://www.postgresql.org/) (Running locally or hosted)
-* [Git](https://git-scm.com/)
+### 1. Backend Setup
 
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/db-browser.git
-cd db-browser
-
-```
-
-### 2. Backend Setup
-
-Navigate to the backend directory, install dependencies, and configure your environment.
-
+1. Navigate to the backend directory:
 ```bash
 cd backend
 npm install
 
 ```
 
-**Create a `.env` file in the `backend` directory:**
 
+2. Create your environment variables:
+```bash
+cp .env.example .env
+
+```
+
+
+3. Fill in the `.env` file:
 ```env
-# Server Configuration
-PORT=5000
-
-# PostgreSQL Database Credentials
-DB_USER=your_postgres_user
-DB_PASSWORD=your_postgres_password
+# Your central application database credentials
+DB_USER=postgres
 DB_HOST=localhost
+DB_NAME=db_browser_app
+DB_PASSWORD=your_password
 DB_PORT=5432
-DB_NAME=your_target_database
 
-# Authentication
-JWT_SECRET=your_super_secret_jwt_key
+# IMPORTANT: Generate a 32-byte base64 key for encryption:
+# Run: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+CONNECTION_ENCRYPTION_KEY=your_generated_key_here
 
-```
-
-*Optional:* If you need to establish initial users, run the setup script:
-
-```bash
-node setUser.js
+CORS_ORIGIN=http://localhost:5173
 
 ```
 
-**Start the Backend Server:**
 
+4. Run the database migrations to set up the `app_users` and `user_connections` tables:
 ```bash
-# For development
+# Execute the SQL files in /backend/sql/ against your App DB
+
+```
+
+
+5. Start the backend server:
+```bash
 npm run dev
-# OR
-node src/server.js
 
 ```
 
-### 3. Frontend Setup
 
-Open a new terminal window/tab, navigate to the frontend directory, and install the dependencies.
 
+### 2. Frontend Setup
+
+1. Navigate to the frontend directory:
 ```bash
 cd db-browser-frontend
 npm install
 
 ```
 
-**Start the Frontend Development Server:**
 
+2. Start the Vite development server:
 ```bash
 npm run dev
 
 ```
 
-The Vite server will typically launch on `http://localhost:5173`.
+
+3. Open `https://db-browser-one.vercel.app/` in your browser!
 
 ---
 
-## 💡 Usage Guide
+## 📖 How to Use
 
-1. **Authentication:** Upon loading the app, enter your credentials in the `Login` view. The backend will validate via Bcrypt and return a JWT.
-2. **Navigation:** Use the `Sidebar` to view the active PostgreSQL schema. Click on tables to spawn a new workspace tab.
-3. **Viewing Data:** The `TableWorkspace` uses AG Grid. You can drag columns to rearrange, use column headers to filter records, and click headers to sort.
-4. **SQL Translation:** Enter natural language queries into the input field; the `sqlTranslator.js` utility will convert your request into a valid SQL string and fetch the results.
-5. **Export:** Click the export button within a workspace tab to trigger the backend `json2csv` pipeline, instantly downloading your current view as a CSV file.
+1. **Open the App:** Launch the frontend. A unique Device ID is automatically generated and saved to identify your session.
+2. **Add a Connection:** Click "+ Add Connection" in the sidebar. Enter your target database details (Host, Port, User, Password, DB Name).
+* *Note: If connecting to a DB with a self-signed cert (like AWS RDS without a CA bundle), uncheck "Enforce strict SSL".*
+
+
+3. **Browse:** Click on your newly created connection. The app will securely connect and list available schemas and tables.
+4. **Query:** Navigate to the SQL editor tab to write and execute raw SQL queries.
+5. **Export:** Click the "Export CSV" button on any result set to download the data.
 
 ---
 
-## 🛡️ Security Considerations
+## 🛡️ Security Notes
 
-* **Never commit `.env` files.** The `.gitignore` is already configured to prevent this.
-* **JWT Expiration:** Ensure tokens have a reasonable expiration time set in `authRoutes.js`.
-* **SQL Injection:** Ensure the backend `databaseRoutes.js` strictly utilizes parameterized queries (`pg` module's `$1, $2` syntax) rather than string concatenation, especially when parsing outputs from the `sqlTranslator`.
+* **Never commit your `.env` file or `CONNECTION_ENCRYPTION_KEY`.** If this key is lost, you will be permanently unable to decrypt any saved database passwords.
+* Passwords are never sent back to the frontend. The API endpoints explicitly filter out the `db_password_encrypted` field when listing connections.
+* SQL execution is safeguarded by strict timeout configurations (`SET statement_timeout = 60000`) to prevent malicious or heavy queries from locking up the application.
+
+---
+
+*Developed by Janvi Hegde*
+"""
+
+with open("README.md", "w", encoding="utf-8") as f:
+f.write(content)
+
+print("README.md created successfully.")
+
+```
+Your Markdown file is ready
+[file-tag: code-generated-file-0-1783937214268336759]
+
+I've put together a comprehensive, professional `README.md` for your DB Browser repository. It covers everything from the tech stack and security architecture to local setup instructions and a Mermaid.js sequence diagram that visually explains how the credentials flow securely through the application. 
+
+You can drop this directly into your GitHub repository! Let me know if you want to tweak any specific sections.
+
+```
