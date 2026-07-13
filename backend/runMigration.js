@@ -20,13 +20,17 @@ const pool = new Pool({
 });
 
 async function run() {
-  const sqlPath = path.join(__dirname, 'sql', '001_create_user_connections.sql');
-  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const sqlDir = path.join(__dirname, 'sql');
+  const files = fs.readdirSync(sqlDir).filter(f => f.endsWith('.sql')).sort();
 
   console.log(`Connecting to ${process.env.DB_HOST}/${process.env.DB_NAME} ...`);
   try {
-    await pool.query(sql);
-    console.log('✅ Migration applied successfully — user_connections table is ready.');
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(sqlDir, file), 'utf8');
+      console.log(`Applying ${file} ...`);
+      await pool.query(sql);
+    }
+    console.log('✅ All migrations applied successfully.');
   } catch (err) {
     console.error('❌ Migration failed:', err.message);
     process.exitCode = 1;

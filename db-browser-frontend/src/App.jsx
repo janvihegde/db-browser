@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { CircularProgress } from '@mui/material';
 import Sidebar from './components/Sidebar.jsx';
 import TableWorkspace from './components/TableWorkspace.jsx';
-import Login from './components/Login.jsx';
 import ConnectionManager from './components/ConnectionManager.jsx';
 import api from './services/api';
 
@@ -17,18 +16,20 @@ function App() {
   const [isLoadingTables, setIsLoadingTables] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
 
-  // Authentication State
+  // Identity State — no login, just whichever device/user record the
+  // X-Device-Id header resolves (or auto-creates) to.
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [identityError, setIdentityError] = useState(false);
 
-  // 1. Check Auth Session on Mount
+  // 1. Identify (and auto-register) this device on mount
   useEffect(() => {
     api.get('/auth/me')
       .then(res => {
         setUser(res.data.user);
       })
       .catch(() => {
-        setUser(null);
+        setIdentityError(true);
       })
       .finally(() => {
         setLoading(false);
@@ -53,17 +54,7 @@ function App() {
     }
   }, [selectedConnectionId, selectedDb, selectedSchema]);
 
-  // 3. Handle Logout
-  const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-      setUser(null);
-    } catch (err) {
-      console.error("Logout failed", err);
-    }
-  };
-
-  // 4. Switch back to the connection picker
+  // 3. Switch back to the connection picker
   const handleSwitchConnection = () => {
     setSelectedConnectionId(null);
     setSelectedDb(null);
@@ -82,9 +73,16 @@ function App() {
     );
   }
 
-  // If no user session, render the Login screen
-  if (!user) {
-    return <Login onLoginSuccess={(userData) => setUser(userData)} />;
+  // Couldn't reach the backend / register this device — show a simple retry
+  if (identityError || !user) {
+    return (
+      <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center', alignItems: 'center', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+        <p>Couldn't connect to the server. Please check your connection and try again.</p>
+        <button onClick={() => window.location.reload()} style={{ padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>
+          Retry
+        </button>
+      </div>
+    );
   }
 
   // Logged in but no database connection selected yet — show the picker
@@ -94,17 +92,6 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ fontWeight: 600, fontSize: '1.2rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             🐘 DB Browser
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>
-              Logged in as <strong style={{ color: 'var(--text-primary)' }}>{user.email}</strong>
-            </span>
-            <button
-              onClick={handleLogout}
-              style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Logout
-            </button>
           </div>
         </div>
         <ConnectionManager onSelectConnection={setSelectedConnectionId} />
@@ -127,17 +114,6 @@ function App() {
             style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
           >
             Switch Connection
-          </button>
-          <span style={{ color: 'var(--text-secondary)' }}>
-            Logged in as <strong style={{ color: 'var(--text-primary)' }}>{user.email}</strong> 
-          </span>
-          <button 
-            onClick={handleLogout} 
-            style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseEnter={(e) => { e.target.style.backgroundColor = '#ef4444'; e.target.style.color = '#fff'; }}
-            onMouseLeave={(e) => { e.target.style.backgroundColor = 'transparent'; e.target.style.color = '#ef4444'; }}
-          >
-            Logout
           </button>
         </div>
       </div>

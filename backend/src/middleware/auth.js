@@ -1,24 +1,35 @@
-const jwt = require('jsonwebtoken');
+const { getAppPool } = require('../config/db');
 
-// Fail fast in production if a real secret isn't configured — silently
-// falling back to a hardcoded value would let anyone forge valid tokens.
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET must be set in production. Generate one with: openssl rand -base64 32');
-}
-
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_dev_key';
-
-// Middleware 1: Verify JWT
-const requireAuth = (req, res, next) => {
-    const token = req.cookies?.token;
-    if (!token) return res.status(401).json({ error: 'Unauthorized: No token provided' });
+// Middleware 1: Identify the user by device ID (no password, no session cookie).
+// The frontend generates a random UUID once and sends it as X-Device-Id on
+// every request. First time we see a device ID, we create a user row for it;
+// every time after that, we just look it up. New devices default to 'Editor'.
+const requireAuth = async (req, res, next) => {
+    const deviceId = req.headers['x-device-id'];
+    if (!deviceId) return res.status(401).json({ error: 'Unauthorized: No device ID provided' });
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded; // { id, email, role }
+        const existing = await getAppPool().query(
+            'SELECT id, device_id, role FROM app_users WHERE device_id = $1',
+            [deviceId]
+        );
+
+        let user;
+        if (existing.rows.length > 0) {
+            user = existing.rows[0];
+        } else {
+            const inserted = await getAppPool().query(
+                `INSERT INTO app_users (device_id, role) VALUES ($1, 'Editor') RETURNING id, device_id, role;`,
+                [deviceId]
+            );
+            user = inserted.rows[0];
+        }
+
+        req.user = user; // { id, device_id, role }
         next();
     } catch (err) {
-        res.status(401).json({ error: 'Unauthorized: Invalid token' });
+        console.error('Auth lookup failed:', err.message);
+        res.status(500).json({ error: 'Unauthorized: Could not verify device' });
     }
 };
 
@@ -32,7 +43,7 @@ const enforceSqlRoles = (req, res, next) => {
     // Extract the first word of the query (e.g., SELECT, INSERT, WITH, EXPLAIN)
     const match = sql.trim().match(/^[a-z]+/i);
     if (!match) return res.status(400).json({ error: 'Invalid SQL structure' });
-    
+
     const command = match[0].toUpperCase();
 
     // Viewer permissions
