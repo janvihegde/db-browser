@@ -15,15 +15,17 @@ const { requireAuth } = require('./middleware/auth');
 const app = express(); 
 const PORT = process.env.PORT || 5000;
 
-// 3. Setup Global Middleware
-// CORS_ORIGIN must be set in production (e.g. your Vercel URL). Falling back
-// to localhost keeps local dev working without code changes.
-app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-    credentials: true
-}));
+
+
+// 2. Configure CORS
+const corsOptions = {
+  origin: 'https://db-browser-ous7jqsmz-janvi-s-projects7.vercel.app/', // <-- REPLACE THIS with your actual Vercel URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions)); // 3. Use the middleware
 app.use(express.json());
-app.use(cookieParser());
 
 // 4. Register Routes
 // Health check for Render's readiness/liveness probes — no auth required.
