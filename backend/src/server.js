@@ -19,10 +19,9 @@ const PORT = process.env.PORT || 5000;
 
 // 2. Configure CORS
 app.use(cors({
-  origin: ['https://db-browser-ous7jqsmz-janvi-s-projects7.vercel.app/'], // Replace with your actual Vercel URL
+  origin: ['https://db-browser-one.vercel.app'],
   credentials: true
 }));
-
 
 app.use(express.json());
 
@@ -42,5 +41,4 @@ app.use('/api/connections', connectionRoutes);
 // 5. Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
-
+});
