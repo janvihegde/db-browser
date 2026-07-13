@@ -12,12 +12,12 @@ const { requireAuth } = require('./middleware/auth');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 3. Configure CORS — X-Device-Id must be explicitly allowed since it's a
-// custom header the browser will preflight.
+// 3. Setup Global Middleware
+// CORS_ORIGIN must be set in production (e.g. your Vercel URL). Falling back
+// to localhost keeps local dev working without code changes.
 app.use(cors({
-  origin: ['https://db-browser-one.vercel.app'],
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'X-Device-Id']
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    credentials: true
 }));
 
 app.use(express.json());
@@ -33,4 +33,5 @@ app.use('/api/connections', connectionRoutes);
 // 5. Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-});
+}); 
+
