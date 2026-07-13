@@ -23,7 +23,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(cors(corsOptions)); // 3. Use the middleware
+
 app.use(express.json());
 
 // 4. Register Routes
