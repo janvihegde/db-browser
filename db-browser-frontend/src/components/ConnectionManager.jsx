@@ -71,8 +71,12 @@ const ConnectionManager = ({ onSelectConnection }) => {
       const res = await api.post('/connections/test', form);
       setTestSuccess(res.data.message || 'Connection verified successfully!');
     } catch (err) {
-      // This will trigger the Toast pop-up with the exact error message
-      setError(err.response?.data?.error || 'Connection verification failed.');
+      // FIX: Add err.message as a fallback so network errors don't get swallowed
+      setError(
+         err.response?.data?.error || 
+         err.message || 
+         'Connection verification failed.'
+      );
     } finally {
       setIsTesting(false);
     }

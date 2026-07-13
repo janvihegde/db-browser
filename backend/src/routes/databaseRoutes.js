@@ -76,6 +76,7 @@ router.use('/:connectionId', resolveConnection);
 // ---------------------------------------------------------------------------
 
 // GET /api/database/:connectionId/list — databases visible on this connection
+// GET /api/database/:connectionId/list
 router.get('/:connectionId/list', async (req, res) => {
   try {
     const pool = getUserPool(req.dbConnection, req.dbConnection.database_name);
@@ -83,7 +84,8 @@ router.get('/:connectionId/list', async (req, res) => {
     res.json({ databases: rows.map(row => row.datname) });
   } catch (error) {
     console.error('Failed to list databases:', error.message);
-    res.status(500).json({ error: 'Failed to fetch databases' });
+    
+    res.status(500).json({ error: `Connection Failed: ${error.message}` }); 
   }
 });
 
