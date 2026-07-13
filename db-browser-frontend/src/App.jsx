@@ -141,19 +141,19 @@ function App() {
           ) : selectedSchema ? (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
               
-              {/* NEW: Go Back Button */}
+              {/* NEW: Go Back to Schemas Button */}
               <button 
                 onClick={() => setSelectedSchema(null)} 
                 style={{ 
-                  marginBottom: '16px', 
                   background: 'transparent', 
                   border: 'none', 
-                  color: 'var(--text-secondary)', 
+                  color: 'var(--accent-teal)', 
                   cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  fontSize: '0.9rem',
-                  padding: 0 
+                  fontSize: '0.95rem',
+                  padding: '0 0 16px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: 500
                 }}
               >
                 ← Back to Schemas
@@ -167,7 +167,6 @@ function App() {
                 <h3 style={{ color: 'var(--text-secondary)', fontWeight: 400, borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
                   Tables ({tables.length})
                 </h3>
-                
                 {isLoadingTables ? (
                   <CircularProgress size={24} sx={{ color: 'var(--text-primary)', mt: 2 }} />
                 ) : (
