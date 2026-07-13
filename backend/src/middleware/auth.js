@@ -37,7 +37,8 @@ const requireAuth = async (req, res, next) => {
 const enforceSqlRoles = (req, res, next) => {
     if (req.user.role === 'Admin') return next(); // Admin can run anything
 
-    const sql = req.body.sql || req.query.sql;
+    // safely check using optional chaining (?.)
+    const sql = req.body?.sql || req.query?.sql;
     if (!sql) return next();
 
     // Extract the first word of the query (e.g., SELECT, INSERT, WITH, EXPLAIN)
