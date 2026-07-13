@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-const Sidebar = ({ selectedDb, onSelectDb, selectedSchema, onSelectSchema, onSelectTable }) => {
+const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelectSchema, onSelectTable }) => {
   const [databases, setDatabases] = useState([]);
   const [schemas, setSchemas] = useState([]);
   const [expandedDb, setExpandedDb] = useState(null);
@@ -13,30 +13,31 @@ const Sidebar = ({ selectedDb, onSelectDb, selectedSchema, onSelectSchema, onSel
 
   // Initial load: Fetch databases
   useEffect(() => {
-    api.get('/database/list')
+    if (!connectionId) return;
+    api.get(`/database/${connectionId}/list`)
       .then(res => setDatabases(res.data.databases || []))
       .catch(err => console.error("Failed to fetch DBs", err));
-  }, []);
+  }, [connectionId]);
 
   // Fetch schemas when a DB is expanded
   useEffect(() => {
-    if (expandedDb) {
-      api.get(`/database/${expandedDb}/schemas`)
+    if (expandedDb && connectionId) {
+      api.get(`/database/${connectionId}/${expandedDb}/schemas`)
         .then(res => setSchemas(res.data.schemas || []))
         .catch(err => console.error("Failed to fetch schemas", err));
     }
-  }, [expandedDb]);
+  }, [expandedDb, connectionId]);
 
   // Debounced search — fires 300ms after the user stops typing
   useEffect(() => {
-    if (!selectedDb || !searchTerm.trim()) {
+    if (!selectedDb || !connectionId || !searchTerm.trim()) {
       setSearchResults(null);
       return;
     }
 
     setIsSearching(true);
     const timer = setTimeout(() => {
-      api.get(`/database/${selectedDb}/search`, { params: { q: searchTerm.trim() } })
+      api.get(`/database/${connectionId}/${selectedDb}/search`, { params: { q: searchTerm.trim() } })
         .then(res => setSearchResults(res.data))
         .catch(err => {
           console.error("Search failed", err);
@@ -46,7 +47,7 @@ const Sidebar = ({ selectedDb, onSelectDb, selectedSchema, onSelectSchema, onSel
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedDb]);
+  }, [searchTerm, selectedDb, connectionId]);
 
   const handleDbClick = (db) => {
     setExpandedDb(expandedDb === db ? null : db);

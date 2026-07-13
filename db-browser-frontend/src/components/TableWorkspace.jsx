@@ -7,7 +7,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import api from '../services/api';
 import Toast from './Toast.jsx';
 
-const TableWorkspace = ({ db, schema, table, onBack }) => {
+const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   const [activeTab, setActiveTab] = useState(0);
 
   // Data Preview State
@@ -31,7 +31,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
   const [rowCount, setRowCount] = useState(null);
 
   // Base path for all routes scoped to this database/schema/table
-  const tableBasePath = `/database/${db}/schemas/${schema}/tables/${table}`;
+  const tableBasePath = `/database/${connectionId}/${db}/schemas/${schema}/tables/${table}`;
 
   // Fetch row count whenever the table changes
   useEffect(() => {
@@ -104,7 +104,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     setQueryError(null);
 
     try {
-      const response = await api.post(`/database/${db}/query`, { sql: sqlQuery });
+      const response = await api.post(`/database/${connectionId}/${db}/query`, { sql: sqlQuery });
 
       let data = [];
       if (Array.isArray(response.data)) data = response.data;
@@ -135,7 +135,7 @@ const TableWorkspace = ({ db, schema, table, onBack }) => {
     if (!sqlQuery.trim()) return;
     const encodedQuery = encodeURIComponent(sqlQuery);
     const base = api.defaults.baseURL || '';
-    const exportUrl = `${base}/database/${db}/query/export?sql=${encodedQuery}`;
+    const exportUrl = `${base}/database/${connectionId}/${db}/query/export?sql=${encodedQuery}`;
     window.open(exportUrl, '_blank');
   };
 

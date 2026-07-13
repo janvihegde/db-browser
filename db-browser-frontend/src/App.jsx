@@ -3,9 +3,13 @@ import { CircularProgress } from '@mui/material';
 import Sidebar from './components/Sidebar.jsx';
 import TableWorkspace from './components/TableWorkspace.jsx';
 import Login from './components/Login.jsx';
+import ConnectionManager from './components/ConnectionManager.jsx';
 import api from './services/api';
 
 function App() {
+  // Connection State — which saved AWS RDS connection is active
+  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
+
   // Database/Workspace State
   const [selectedDb, setSelectedDb] = useState(null);
   const [selectedSchema, setSelectedSchema] = useState(null);
@@ -33,9 +37,9 @@ function App() {
 
   // 2. Fetch tables whenever a schema is selected
   useEffect(() => {
-    if (selectedDb && selectedSchema) {
+    if (selectedConnectionId && selectedDb && selectedSchema) {
       setIsLoadingTables(true);
-      api.get(`/database/${selectedDb}/schemas/${selectedSchema}/tables`)
+      api.get(`/database/${selectedConnectionId}/${selectedDb}/schemas/${selectedSchema}/tables`)
         .then(response => {
           setTables(response.data.tables || []);
           setIsLoadingTables(false);
@@ -47,7 +51,7 @@ function App() {
     } else {
       setTables([]);
     }
-  }, [selectedDb, selectedSchema]);
+  }, [selectedConnectionId, selectedDb, selectedSchema]);
 
   // 3. Handle Logout
   const handleLogout = async () => {
@@ -57,6 +61,14 @@ function App() {
     } catch (err) {
       console.error("Logout failed", err);
     }
+  };
+
+  // 4. Switch back to the connection picker
+  const handleSwitchConnection = () => {
+    setSelectedConnectionId(null);
+    setSelectedDb(null);
+    setSelectedSchema(null);
+    setSelectedTable(null);
   };
 
   // --- RENDERING LOGIC ---
@@ -75,6 +87,31 @@ function App() {
     return <Login onLoginSuccess={(userData) => setUser(userData)} />;
   }
 
+  // Logged in but no database connection selected yet — show the picker
+  if (!selectedConnectionId) {
+    return (
+      <div style={{ minHeight: '100vh', width: '100vw', margin: 0, fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ fontWeight: 600, fontSize: '1.2rem', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            🐘 DB Browser
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>
+              Logged in as <strong style={{ color: 'var(--text-primary)' }}>{user.email}</strong>
+            </span>
+            <button
+              onClick={handleLogout}
+              style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+        <ConnectionManager onSelectConnection={setSelectedConnectionId} />
+      </div>
+    );
+  }
+
   // Main Authenticated Workspace
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', margin: 0, padding: 0, fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}>
@@ -85,6 +122,12 @@ function App() {
           🐘 DB Browser
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
+          <button
+            onClick={handleSwitchConnection}
+            style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Switch Connection
+          </button>
           <span style={{ color: 'var(--text-secondary)' }}>
             Logged in as <strong style={{ color: 'var(--text-primary)' }}>{user.email}</strong> 
           </span>
@@ -102,6 +145,7 @@ function App() {
       {/* Main App Layout */}
       <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
         <Sidebar 
+          connectionId={selectedConnectionId}
           selectedDb={selectedDb} 
           onSelectDb={setSelectedDb} 
           selectedSchema={selectedSchema}
@@ -112,6 +156,7 @@ function App() {
         <main style={{ padding: '60px', flexGrow: 1, backgroundColor: 'var(--bg-main)', overflowY: 'auto' }}>
           {selectedTable ? (
             <TableWorkspace 
+              connectionId={selectedConnectionId}
               db={selectedDb} 
               schema={selectedSchema} 
               table={selectedTable} 

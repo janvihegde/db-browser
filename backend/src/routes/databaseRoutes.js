@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { getPool, defaultPool } = require('../config/db');
+const { getAppPool, getUserPool } = require('../config/db');
+const { decrypt } = require('../utils/crypto');
 const { Parser } = require('json2csv');
 const { requireAuth, enforceSqlRoles } = require('../middleware/auth');
 
@@ -8,20 +9,32 @@ const { requireAuth, enforceSqlRoles } = require('../middleware/auth');
 router.use(requireAuth);
 
 // Enforce Viewer/Editor/Admin permissions on any route carrying SQL
-// (req.body.sql or req.query.sql)
 router.use(enforceSqlRoles);
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Confirm `db` is a real, existing database on this Postgres instance before
-// creating a pool or running anything against it. This isn't a SQL injection
-// guard (the db name goes into the pool's `database` connection param, not
-// concatenated SQL) — it's about not creating pools for typo'd/garbage names
-// and giving a clean 404 instead of a confusing connection error.
-async function isValidDatabase(dbName) {
-  const { rows } = await defaultPool().query(
+// Loads a saved connection, but ONLY if it belongs to the requesting user —
+// this is the ownership check that stops User A from browsing User B's
+// database just by guessing a connection id in the URL.
+async function loadOwnedConnection(connectionId, userId) {
+  const { rows } = await getAppPool().query(
+    `SELECT * FROM user_connections WHERE id = $1 AND user_id = $2;`,
+    [connectionId, userId]
+  );
+  if (rows.length === 0) return null;
+
+  const conn = rows[0];
+  conn.db_password = decrypt(conn.db_password_encrypted); // decrypt in memory only
+  return conn;
+}
+
+// Confirm `db` is a real, existing database on this connection's Postgres
+// instance before creating a pool for it or running anything against it.
+async function isValidDatabase(conn, dbName) {
+  const pool = getUserPool(conn, conn.database_name);
+  const { rows } = await pool.query(
     'SELECT 1 FROM pg_database WHERE datname = $1 AND datistemplate = false;',
     [dbName]
   );
@@ -29,9 +42,8 @@ async function isValidDatabase(dbName) {
 }
 
 // Confirm schema/table actually exist before using them as interpolated
-// identifiers in a query — this IS the SQL injection guard, since Postgres
-// doesn't support parameterizing identifiers (table/schema names) the way
-// it does values.
+// identifiers in a query (SQL injection guard — Postgres can't parameterize
+// identifiers the way it does values).
 async function isValidTable(pool, schema, table) {
   const { rows } = await pool.query(
     `SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2 LIMIT 1;`,
@@ -40,78 +52,90 @@ async function isValidTable(pool, schema, table) {
   return rows.length > 0;
 }
 
+// Middleware: resolves :connectionId into req.dbConnection (an owned,
+// decrypted connection record) for every route below. 404s if the
+// connection doesn't exist or doesn't belong to the requesting user.
+async function resolveConnection(req, res, next) {
+  try {
+    const conn = await loadOwnedConnection(req.params.connectionId, req.user.id);
+    if (!conn) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    req.dbConnection = conn;
+    next();
+  } catch (error) {
+    console.error('Failed to resolve connection:', error.message);
+    res.status(500).json({ error: 'Failed to resolve database connection' });
+  }
+}
+
+router.use('/:connectionId', resolveConnection);
+
 // ---------------------------------------------------------------------------
 // Read-only metadata & data browsing
 // ---------------------------------------------------------------------------
 
-// GET /api/database/list
-router.get('/list', async (req, res) => {
+// GET /api/database/:connectionId/list — databases visible on this connection
+router.get('/:connectionId/list', async (req, res) => {
   try {
-    const { rows } = await defaultPool().query(
-      'SELECT datname FROM pg_database WHERE datistemplate = false;'
-    );
+    const pool = getUserPool(req.dbConnection, req.dbConnection.database_name);
+    const { rows } = await pool.query('SELECT datname FROM pg_database WHERE datistemplate = false;');
     res.json({ databases: rows.map(row => row.datname) });
   } catch (error) {
+    console.error('Failed to list databases:', error.message);
     res.status(500).json({ error: 'Failed to fetch databases' });
   }
 });
 
-// GET /api/database/:db/schemas
-router.get('/:db/schemas', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas
+router.get('/:connectionId/:db/schemas', async (req, res) => {
   const { db } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
-    const query = `
+    const pool = getUserPool(req.dbConnection, db);
+    const { rows } = await pool.query(`
       SELECT schema_name 
       FROM information_schema.schemata 
       WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast');
-    `;
-    const { rows } = await pool.query(query);
+    `);
     res.json({ schemas: rows.map(row => row.schema_name) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch schemas' });
   }
 });
 
-// GET /api/database/:db/schemas/:schema/tables
-router.get('/:db/schemas/:schema/tables', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas/:schema/tables
+router.get('/:connectionId/:db/schemas/:schema/tables', async (req, res) => {
   const { db, schema } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
-    const query = `
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = $1;
-    `;
-    const { rows } = await pool.query(query, [schema]);
+    const pool = getUserPool(req.dbConnection, db);
+    const { rows } = await pool.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = $1;`,
+      [schema]
+    );
     res.json({ tables: rows.map(row => row.table_name) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch tables' });
   }
 });
 
-// GET /api/database/:db/schemas/:schema/tables/:table/columns
-router.get('/:db/schemas/:schema/tables/:table/columns', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas/:schema/tables/:table/columns
+router.get('/:connectionId/:db/schemas/:schema/tables/:table/columns', async (req, res) => {
   const { db, schema, table } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
+    const pool = getUserPool(req.dbConnection, db);
     if (!(await isValidTable(pool, schema, table))) {
       return res.status(404).json({ error: 'Schema or table not found' });
     }
 
-    // NOTE: the original version of this query filtered PK/FK subqueries by
-    // table_name only, not schema — two schemas with a same-named table
-    // would cross-contaminate PK/FK flags. Fixed by filtering on
-    // table_schema everywhere below.
     const query = `
       SELECT 
         c.column_name, 
@@ -146,19 +170,18 @@ router.get('/:db/schemas/:schema/tables/:table/columns', async (req, res) => {
   }
 });
 
-// GET /api/database/:db/schemas/:schema/tables/:table/preview
-router.get('/:db/schemas/:schema/tables/:table/preview', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas/:schema/tables/:table/preview
+router.get('/:connectionId/:db/schemas/:schema/tables/:table/preview', async (req, res) => {
   const { db, schema, table } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
+    const pool = getUserPool(req.dbConnection, db);
     if (!(await isValidTable(pool, schema, table))) {
       return res.status(404).json({ error: 'Schema or table not found' });
     }
 
-    // Safe now: schema/table are confirmed real, existing identifiers.
     const query = `SELECT * FROM "${schema}"."${table}" LIMIT 100;`;
     const { rows } = await pool.query(query);
     res.json({ data: rows });
@@ -167,18 +190,14 @@ router.get('/:db/schemas/:schema/tables/:table/preview', async (req, res) => {
   }
 });
 
-// GET /api/database/:db/schemas/:schema/tables/:table/count
-// Uses an extremely fast estimate from pg_class instead of a slow COUNT(*)
-router.get('/:db/schemas/:schema/tables/:table/count', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas/:schema/tables/:table/count
+router.get('/:connectionId/:db/schemas/:schema/tables/:table/count', async (req, res) => {
   const { db, schema, table } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
-    // Fixed: original query matched by relname only, so a table name that
-    // existed in two schemas would return whichever pg_class happened to
-    // list first. Joining pg_namespace scopes it to the right schema.
+    const pool = getUserPool(req.dbConnection, db);
     const query = `
       SELECT c.reltuples::bigint AS estimate
       FROM pg_class c
@@ -187,7 +206,6 @@ router.get('/:db/schemas/:schema/tables/:table/count', async (req, res) => {
     `;
     const { rows } = await pool.query(query, [schema, table]);
     const count = rows.length > 0 ? rows[0].estimate : 0;
-
     res.json({ rowCount: count });
   } catch (error) {
     console.error('Count Error:', error.message);
@@ -195,53 +213,37 @@ router.get('/:db/schemas/:schema/tables/:table/count', async (req, res) => {
   }
 });
 
-// GET /api/database/:db/schemas/:schema/tables/:table/relationships
-// Returns this table's foreign keys (outgoing) and any tables that
-// reference this one (incoming) — powers the "View relationships" tab.
-// NOTE: assumes single-column foreign keys, which covers the vast majority
-// of real-world schemas. Composite (multi-column) FKs will show each
-// column as a separate row rather than grouped correctly.
-router.get('/:db/schemas/:schema/tables/:table/relationships', async (req, res) => {
+// GET /api/database/:connectionId/:db/schemas/:schema/tables/:table/relationships
+router.get('/:connectionId/:db/schemas/:schema/tables/:table/relationships', async (req, res) => {
   const { db, schema, table } = req.params;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
+    const pool = getUserPool(req.dbConnection, db);
     if (!(await isValidTable(pool, schema, table))) {
       return res.status(404).json({ error: 'Schema or table not found' });
     }
 
     const outgoingQuery = `
-      SELECT
-        tc.constraint_name,
-        kcu.column_name,
-        ccu.table_schema AS referenced_schema,
-        ccu.table_name AS referenced_table,
-        ccu.column_name AS referenced_column
+      SELECT tc.constraint_name, kcu.column_name,
+        ccu.table_schema AS referenced_schema, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
       FROM information_schema.table_constraints tc
       JOIN information_schema.key_column_usage kcu
         ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
       JOIN information_schema.constraint_column_usage ccu
         ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1 AND tc.table_name = $2;
+      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2;
     `;
-
     const incomingQuery = `
-      SELECT
-        tc.constraint_name,
-        tc.table_schema AS referencing_schema,
-        tc.table_name AS referencing_table,
-        kcu.column_name AS referencing_column,
-        ccu.column_name AS referenced_column
+      SELECT tc.constraint_name, tc.table_schema AS referencing_schema, tc.table_name AS referencing_table,
+        kcu.column_name AS referencing_column, ccu.column_name AS referenced_column
       FROM information_schema.table_constraints tc
       JOIN information_schema.key_column_usage kcu
         ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
       JOIN information_schema.constraint_column_usage ccu
         ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND ccu.table_schema = $1 AND ccu.table_name = $2;
+      WHERE tc.constraint_type = 'FOREIGN KEY' AND ccu.table_schema = $1 AND ccu.table_name = $2;
     `;
 
     const [outgoing, incoming] = await Promise.all([
@@ -256,10 +258,8 @@ router.get('/:db/schemas/:schema/tables/:table/relationships', async (req, res) 
   }
 });
 
-// GET /api/database/:db/search?q=...
-// Searches table names and column names across all user schemas in the
-// given database — powers the sidebar search box.
-router.get('/:db/search', async (req, res) => {
+// GET /api/database/:connectionId/:db/search?q=...
+router.get('/:connectionId/:db/search', async (req, res) => {
   const { db } = req.params;
   const { q } = req.query;
   if (!q || !q.trim()) {
@@ -267,32 +267,25 @@ router.get('/:db/search', async (req, res) => {
   }
 
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
+    const pool = getUserPool(req.dbConnection, db);
     const likeTerm = `%${q.trim()}%`;
 
-    const tablesQuery = `
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
-        AND table_name ILIKE $1
-      ORDER BY table_schema, table_name
-      LIMIT 50;
-    `;
-    const columnsQuery = `
-      SELECT table_schema, table_name, column_name
-      FROM information_schema.columns
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
-        AND column_name ILIKE $1
-      ORDER BY table_schema, table_name, column_name
-      LIMIT 50;
-    `;
-
     const [tables, columns] = await Promise.all([
-      pool.query(tablesQuery, [likeTerm]),
-      pool.query(columnsQuery, [likeTerm])
+      pool.query(
+        `SELECT table_schema, table_name FROM information_schema.tables
+         WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast') AND table_name ILIKE $1
+         ORDER BY table_schema, table_name LIMIT 50;`,
+        [likeTerm]
+      ),
+      pool.query(
+        `SELECT table_schema, table_name, column_name FROM information_schema.columns
+         WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast') AND column_name ILIKE $1
+         ORDER BY table_schema, table_name, column_name LIMIT 50;`,
+        [likeTerm]
+      )
     ]);
 
     res.json({ tables: tables.rows, columns: columns.rows });
@@ -306,18 +299,18 @@ router.get('/:db/search', async (req, res) => {
 // Query execution & export
 // ---------------------------------------------------------------------------
 
-// POST /api/database/:db/query
-router.post('/:db/query', async (req, res) => {
+// POST /api/database/:connectionId/:db/query
+router.post('/:connectionId/:db/query', async (req, res) => {
   const { db } = req.params;
   const { sql } = req.body;
   if (!sql) return res.status(400).json({ error: 'SQL query is required' });
 
   let pool;
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    pool = getPool(db);
+    pool = getUserPool(req.dbConnection, db);
   } catch (e) {
     return res.status(500).json({ error: 'Failed to validate database' });
   }
@@ -325,17 +318,12 @@ router.post('/:db/query', async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // Safety Net: 60-second timeout
     await client.query('SET statement_timeout = 60000');
-
-    // Execute the user-provided SQL
     const result = await client.query(sql);
-
     res.json({ rows: result.rows, fields: result.fields });
   } catch (err) {
     console.error("Database query error:", err);
 
-    // Friendly Error Mapping
     if (err.code === '57014') {
         return res.status(408).json({ error: 'Query Timed Out: Execution exceeded 60 seconds.' });
     } else if (err.code === '42601') {
@@ -353,17 +341,17 @@ router.post('/:db/query', async (req, res) => {
   }
 });
 
-// GET /api/database/:db/query/export?sql=...
-router.get('/:db/query/export', async (req, res) => {
+// GET /api/database/:connectionId/:db/query/export?sql=...
+router.get('/:connectionId/:db/query/export', async (req, res) => {
   const { db } = req.params;
   const { sql } = req.query;
   if (!sql) return res.status(400).json({ error: 'SQL query is required for export' });
 
   try {
-    if (!(await isValidDatabase(db))) {
+    if (!(await isValidDatabase(req.dbConnection, db))) {
       return res.status(404).json({ error: 'Database not found' });
     }
-    const pool = getPool(db);
+    const pool = getUserPool(req.dbConnection, db);
     const { rows } = await pool.query(sql);
     if (rows.length === 0) return res.status(404).json({ error: 'No data to export' });
 

@@ -1,59 +1,74 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Postgres connections are bound to a single database at connect time —
-// unlike MySQL, you can't just "USE another_db" on the same connection.
-// So "browsing multiple databases" means keeping a small pool per database,
-// not one global pool. Pools are created lazily and cached here.
+// Two kinds of pools live in this app now:
+//
+// 1. The "app" pool — a single, fixed pool (from .env: DB_HOST, DB_USER,
+//    etc.) used ONLY for the app's own internal tables: app_users and
+//    user_connections. This is Anthropic's/your infra, not the user's.
+//
+// 2. "User connection" pools — created dynamically per saved connection
+//    (each user's own AWS RDS credentials, entered via the Connections UI),
+//    keyed by host+port+user+database so the same connection browsing two
+//    databases reuses two small pools rather than one per request.
 
-const baseConfig = {
+const appPoolConfig = {
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT || 5432),
-
-  // AWS RDS PostgreSQL usually requires or supports SSL.
-  // rejectUnauthorized: false skips certificate validation (MITM risk) —
-  // set DB_SSL_REJECT_UNAUTHORIZED=true once you've got the RDS CA bundle
-  // wired in. Left as a togglable default so this doesn't block your first deploy.
   ssl: {
     rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
   },
-
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
-  // Keep this low per-process: if you ever run multiple backend instances,
-  // (process count) x (this number) must stay under your RDS max_connections.
-  // Also remember: this is now PER DATABASE POOL, so if users browse 3
-  // databases, that's up to 3 x DB_POOL_MAX connections from one process.
   max: Number(process.env.DB_POOL_MAX || 10)
 };
 
-const pools = new Map();
+let appPool = null;
+function getAppPool() {
+  if (!appPool) {
+    appPool = new Pool(appPoolConfig);
+    appPool.on('error', (err) => {
+      console.error('Unexpected error on idle PostgreSQL client (app pool)', err);
+    });
+  }
+  return appPool;
+}
+
+// User-connection pools, keyed by a composite string so identical
+// connection details reuse the same pool instead of opening new ones.
+const userPools = new Map();
 
 /**
- * Get (or lazily create) the connection pool for a given database name.
- * Callers are responsible for validating dbName against a real, existing
- * database first (see isValidDatabase in databaseRoutes.js) — this function
- * does not validate, it just connects to whatever name it's given.
+ * Get (or lazily create) a pool for a specific user-supplied RDS connection
+ * + database name. `conn` must already have a decrypted plaintext password
+ * (decrypt it right before calling this, never store it decrypted anywhere
+ * else) — see routes/databaseRoutes.js for how this is used.
  */
-function getPool(dbName) {
-  const key = dbName || process.env.DB_NAME;
-  if (!pools.has(key)) {
-    const pool = new Pool({ ...baseConfig, database: key });
-    pool.on('error', (err) => {
-      console.error(`Unexpected error on idle PostgreSQL client (db: ${key})`, err);
+function getUserPool(conn, databaseName) {
+  const key = `${conn.host}:${conn.port}:${conn.db_user}:${databaseName}`;
+  if (!userPools.has(key)) {
+    const pool = new Pool({
+      user: conn.db_user,
+      host: conn.host,
+      database: databaseName,
+      password: conn.db_password, // must already be decrypted by the caller
+      port: conn.port,
+      ssl: {
+        rejectUnauthorized: !!conn.ssl_reject_unauthorized
+      },
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      max: Number(process.env.DB_POOL_MAX || 10)
     });
-    pools.set(key, pool);
+    pool.on('error', (err) => {
+      console.error(`Unexpected error on idle PostgreSQL client (user pool: ${key})`, err);
+    });
+    userPools.set(key, pool);
   }
-  return pools.get(key);
+  return userPools.get(key);
 }
 
-// The "default" pool (DB_NAME from .env) is used for things that aren't
-// really about browsing a specific database — listing all databases on the
-// instance, and app-level tables like app_users for login.
-function defaultPool() {
-  return getPool(process.env.DB_NAME);
-}
-
-module.exports = { getPool, defaultPool };
+module.exports = { getAppPool, getUserPool };

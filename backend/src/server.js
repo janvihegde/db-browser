@@ -6,6 +6,7 @@ require('dotenv').config();
 // 1. Import Routes & Middleware
 const databaseRoutes = require('./routes/databaseRoutes');
 const authRoutes = require('./routes/authRoutes');
+const connectionRoutes = require('./routes/connectionRoutes');
 const { requireAuth } = require('./middleware/auth');
 
 
@@ -33,6 +34,9 @@ app.use('/api/auth', authRoutes);
 
 // Fixed: Uncommented this line so the backend actually handles your DB requests
 app.use('/api/database', requireAuth, databaseRoutes);
+
+// User-managed AWS RDS connection storage (each user's own DB credentials)
+app.use('/api/connections', connectionRoutes);
 
 // 5. Start the Server
 app.listen(PORT, () => {
