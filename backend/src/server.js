@@ -18,11 +18,10 @@ const PORT = process.env.PORT || 5000;
 
 
 // 2. Configure CORS
-const corsOptions = {
-  origin: 'https://db-browser-ous7jqsmz-janvi-s-projects7.vercel.app/', // <-- REPLACE THIS with your actual Vercel URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true,
-};
+app.use(cors({
+  origin: ['https://db-browser-ous7jqsmz-janvi-s-projects7.vercel.app/'], // Replace with your actual Vercel URL
+  credentials: true
+}));
 
 app.use(cors(corsOptions)); // 3. Use the middleware
 app.use(express.json());
