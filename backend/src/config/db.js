@@ -48,7 +48,10 @@ const userPools = new Map();
  * else) — see routes/databaseRoutes.js for how this is used.
  */
 function getUserPool(conn, databaseName) {
-  const key = `${conn.host}:${conn.port}:${conn.db_user}:${databaseName}`;
+  // FIX: Key by the unique connection ID and database name so that deleting/recreating 
+  // a connection with new SSL properties generates a completely fresh pool.
+  const key = `${conn.id}:${databaseName}`;
+  
   if (!userPools.has(key)) {
     const pool = new Pool({
       user: conn.db_user,
