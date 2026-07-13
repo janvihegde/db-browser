@@ -150,7 +150,7 @@ npm run dev
 ```
 
 
-3. Open `http://localhost:5173` in your browser!
+3. Open `https://db-browser-one.vercel.app/` in your browser!
 
 ---
 
