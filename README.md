@@ -1,164 +1,151 @@
-# 🗄️ DB Browser
+# DB Browser — Local Connector Architecture
 
-A web-based PostgreSQL database browser and query execution tool.
+This repository contains a hybrid cloud-local database client. While the core web application UI is hosted centrally (e.g., on Vercel), ordinary web pages cannot directly access databases bound to `localhost` or private networks due to standard browser security sandboxing. 
 
-DB Browser lets you connect to your own PostgreSQL databases — cloud
-instances (AWS RDS, Supabase, etc.) or databases running on your own
-machine — browse schemas, view table relationships, and run SQL queries
-from the browser, without installing a desktop client.
-
-## ✨ Key Features
-
-* **Two connection modes:** cloud/remote databases go through the hosted
-  backend; databases on your own machine go through a browser extension +
-  local native messaging host, so `localhost` correctly means *your*
-  machine, not the server's.
-* **Role-based access control:** Viewer/Editor/Admin roles restrict which
-  SQL commands can run — Viewers are limited to `SELECT`/`EXPLAIN`,
-  Editors add `INSERT`/`UPDATE`/`DELETE`.
-* **Dynamic connection pooling:** pools are cached per unique connection,
-  reused across requests instead of reconnecting every time.
-* **Schema browsing:** databases, schemas, tables, columns, and foreign
-  key relationships.
-* **SQL editor:** run custom queries with a 60-second timeout to prevent
-  hung transactions.
-* **CSV export** for cloud connections (not yet available for local
-  connections — see the extension's own README).
-* **No signup:** a device ID is generated once per browser and stored
-  locally — no accounts, no passwords.
+This solution uses a lightweight **Chrome/Edge Extension** paired with an OS-level **Native Messaging Host** to safely bridge the gap, enabling developers to browse, preview, and run queries against their local PostgreSQL instances straight from the web app interface.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture & Data Flow
 
-Two different paths depending on where the database lives:
+When a user interacts with a database marked as **Local**, the data flows through the following secure pipeline:
 
-**Cloud/remote databases** — the original flow:
-```
-Browser (React) → Backend (Express, on Render) → Postgres (RDS, Supabase, etc.)
-```
-The backend stores connection metadata (host, port, user, database) in its
-own app database, with the password encrypted at rest (AES-256-GCM,
-decrypted only in memory when a query needs to run).
+```text
+[ Web UI Component ] (Sidebar / TableWorkspace)
+       │
+       ▼ (window.postMessage)
+[ Extension Content Script ] (Runs in page context)
+       │
+       ▼ (chrome.runtime.sendMessage)
+[ Extension Background Worker ] (MV3 Service Worker)
+       │
+       ▼ (Standard I/O Pipe: 4-byte little-endian length prefix + JSON)
+[ Native Messaging Host ] (Local Node.js process)
+       │
+       ▼ (pg Connection Pool)
+[ Local PostgreSQL Database ] (localhost:5432)
+Frontend Client (src/services/extensionBridge.js): Intercepts database calls when a local configuration is active and emits standard window events.
 
-**Local databases** — for databases bound to `localhost` on your own
-machine, which the hosted backend can never reach:
-```
-Browser (React) → Extension → Native messaging host → Postgres (your machine)
-```
-The browser extension relays requests to a small native host process
-running locally, which opens the actual Postgres connection. Local
-connection details are kept in the browser's own `localStorage`, not sent
-to the hosted backend — see `native-host/README.md` (or the extension's own
-docs) for the full setup.
+Content Script (extension/content.js): Bridges the web page world and the isolated extension API world.
 
-The frontend's `dbClient.js` decides which path a given connection uses
-based on whether it's marked local.
+Background Worker (extension/background.js): Acts as a protocol translator, matching unique request IDs to their respective tabs and piping requests to the operating system.
 
----
+Native Host (native-host/native-host.js): A headless Node.js utility executed on-demand by the browser that manages secure PostgreSQL connection pools and speaks back over standard stdin/stdout pipelines.
 
-## 🚀 Tech Stack
+📁 Repository Structure
+Plaintext
+├── db-browser-frontend/       # React + Vite Web Application
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ConnectionManager.jsx  # Manages and tests connection entries
+│   │   │   ├── Sidebar.jsx            # Renders local schema tree & handles metadata searches
+│   │   │   └── TableWorkspace.jsx     # Handles data grid preview, editor queries & metrics
+│   │   └── services/
+│   │       ├── api.js                 # Axios instance for cloud-hosted routing
+│   │       └── extensionBridge.js     # PostMessage handler communicating with the extension
+├── extension/                 # Browser Extension Source (Manifest V3)
+│   ├── manifest.json          # Permissions (nativeMessaging) and page matching scopes
+│   ├── background.js          # Persistent orchestration worker & port mapper
+│   └── content.js             # Window event interceptor injected into authorized origins
+└── native-host/               # Native Messaging Host
+    ├── native-host.js         # Entry node script managing pooling and query execution
+    ├── install.ps1            # Automated Windows Registry installation script
+    └── com.dbbrowser.nativehost.json # Registry manifest telling Chrome where the binary lives
+🛠️ Step-by-Step Setup Guide
+Follow these steps in order to configure your local machine for development or testing:
 
-**Frontend:**
-* React (Vite)
-* Axios (API client for the cloud path)
-* Custom CSS / CSS variables
+Prerequisites
+Node.js (LTS version recommended)
 
-**Backend:**
-* Node.js & Express
-* PostgreSQL (`pg`)
-* Built-in `crypto` for AES-256-GCM (encrypting saved cloud connection passwords)
-* `json2csv` for CSV export
+PostgreSQL running locally (e.g., on port 5432)
 
-**Local connector (for databases on your own machine):**
-* A Chrome/Edge extension (Manifest V3)
-* A native messaging host (Node.js, talks to Postgres the same way the
-  backend does, just running locally instead of on Render)
+Google Chrome or Microsoft Edge browser
 
----
+Step 1: Install & Register the Native Host
+The browser needs to know that an authorized local script is available to handle I/O requests.
 
-## 🛠️ Getting Started (Local Development)
+Open PowerShell as a normal user.
 
-### Prerequisites
-* Node.js (v18+)
-* A PostgreSQL instance for the app's own tables (`app_users`,
-  `user_connections`) — this is separate from whatever database(s) you
-  actually want to browse.
+Navigate to the native-host directory:
 
-### 1. Backend setup
+PowerShell
+cd native-host
+Execute the automated installation script:
 
-```bash
-cd backend
-npm install
-cp .env.example .env
-```
+PowerShell
+.\install.ps1
+What this script does behind the scenes:
 
-Fill in `.env`:
-```env
-DB_USER=postgres
-DB_HOST=localhost
-DB_NAME=db_browser_app
-DB_PASSWORD=your_password
-DB_PORT=5432
+Verifies your Node.js runtime availability.
 
-# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-CONNECTION_ENCRYPTION_KEY=your_generated_key_here
+Copies the runner utilities into your local application state ($env:LOCALAPPDATA\DBBrowserNativeHost).
 
-CORS_ORIGIN=http://localhost:5173
-```
+Automatically pulls the pg database library dependencies into the deployment target folder.
 
-Run the migrations in `backend/sql/` against that database, then:
-```bash
-npm run dev
-```
+Generates a structural runtime .bat file wrapper.
 
-### 2. Frontend setup
+Configures a user-scoped registry entry at HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.dbbrowser.nativehost pointing directly to the configuration manifest.
 
-```bash
+Step 2: Load the Browser Extension
+Open your browser and navigate to the extensions control page:
+
+Chrome: chrome://extensions/
+
+Edge: edge://extensions/
+
+Toggle Developer mode on (typically a switch in the top-right corner).
+
+Click the Load unpacked button in the top-left corner.
+
+Select the extension folder located inside this repository directory.
+
+Note: You will now see the extension DB Browser Local Connector active in your extension list.
+
+Step 3: Run the React Web Application
+Open a terminal window and enter the frontend package workspace:
+
+Bash
 cd db-browser-frontend
+Install client-side dependencies:
+
+Bash
 npm install
+Boot your local Vite development engine:
+
+Bash
 npm run dev
-```
+Open the printed localhost URL in your browser (typically http://localhost:5173/).
 
-Open the URL Vite prints (typically `http://localhost:5173`).
+🔌 How to Use the Local Connection Feature
+Open the DB Browser web app interface in your browser.
 
-### 3. (Optional) Local database connector
+Click on + Add Connection.
 
-To browse a database running on your own machine rather than a cloud one,
-see `native-host/install.ps1` (Windows) to register the browser extension +
-native messaging host. Not required if you're only connecting to
-cloud-hosted databases.
+Provide a configuration profile:
 
----
+Label: e.g., Local Dev DB
 
-## 📖 How to Use
+Host: localhost or 127.0.0.1
 
-1. **Open the app** — a device ID is generated automatically on first load.
-2. **Add a connection** — host, port, username, password, database name.
-   Check "This database is on my own machine" if it's local (requires the
-   extension — see above); leave it unchecked for cloud databases.
-3. **Test the connection** before saving, to confirm the credentials work.
-4. **Browse** — schemas, tables, columns, relationships.
-5. **Query** — the SQL editor tab supports arbitrary SQL, subject to your
-   role's permissions.
-6. **Export** — CSV export is available for cloud connections.
+Port: 5432
 
----
+Database Username: Your local Postgres user role
 
-## 🛡️ Security Notes
+Database Password: Your local user password
 
-* **Never commit your `.env` file or `CONNECTION_ENCRYPTION_KEY`.** Losing
-  that key means permanently losing the ability to decrypt any saved cloud
-  connection passwords.
-* Cloud connection passwords are encrypted at rest and never sent back to
-  the frontend — API responses explicitly omit `db_password_encrypted`.
-* Local connection passwords (for databases on your own machine) are kept
-  in the browser's `localStorage` in plaintext, since there's no hosted
-  metadata service for those by design — a different tradeoff than the
-  cloud path, worth knowing if this ever needs to satisfy a stricter threat
-  model.
-* SQL execution has a 60-second statement timeout to prevent runaway
-  queries from locking up a connection.
-* The native host (for local connections) will connect to any host/port
-  reachable from your machine — same latitude the hosted backend has today,
-  just scoped to your own machine instead of Render's network.
+Database Name: The target database you want to mount
+
+Check the box labeled "This database is on my own machine (uses the browser extension)".
+
+Click Test Connection to verify end-to-end viability through the native host layer.
+
+Click Save Connection to record your profile to local device metadata state.
+
+You can now click your newly mounted database inside the workspace panel. The sidebar will populate structural nodes dynamically by inspecting your local information_schema tables, and you can use the interactive data visualizer grids or run complex statements within the SQL tab directly against your machine!
+
+🔒 Security Parameters
+Plaintext Protections: No database credentials or structural system access passwords are ever transmitted or written out onto cloud networks. Everything is isolated locally via standard browser loopbacks (localStorage metadata parameters on your own device).
+
+On-Demand Lifecycle: The native helper agent doesn't sit idle consuming system resources or background threads. The operating system spins it up on-demand strictly when Chrome requests database interaction and terminates it as soon as connection streams close.
+
+Origin Limitations: The extension script limits frame injection visibility to explicit app locations matching http://localhost:5173/* and target deployment application links. External third-party web contexts can never read from or trigger access commands through the local worker pipeline.
