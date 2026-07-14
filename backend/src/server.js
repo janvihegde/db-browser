@@ -6,7 +6,6 @@ require('dotenv').config();
 const databaseRoutes = require('./routes/databaseRoutes');
 const authRoutes = require('./routes/authRoutes');
 const connectionRoutes = require('./routes/connectionRoutes');
-const { requireAuth } = require('./middleware/auth');
 
 // 2. Initialize 'app'
 const app = express();
@@ -27,11 +26,10 @@ app.use(express.json());
 app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
-app.use('/api/database', requireAuth, databaseRoutes);
+app.use('/api/database', databaseRoutes);
 app.use('/api/connections', connectionRoutes);
 
 // 5. Start the Server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
-
+});

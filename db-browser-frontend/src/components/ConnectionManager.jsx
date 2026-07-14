@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import Toast from './Toast'; // <-- Imported your Toast component
 
 const inputStyle = {
   width: '100%',
@@ -49,6 +48,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
 
   const handleFormChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
+    // Clear validation status when things change
     setError(null);
     setTestSuccess(null);
   };
@@ -69,14 +69,9 @@ const ConnectionManager = ({ onSelectConnection }) => {
     setIsTesting(true);
     try {
       const res = await api.post('/connections/test', form);
-      setTestSuccess(res.data.message || 'Connection verified successfully!');
+      setTestSuccess(res.data.message || 'Connection test successful!');
     } catch (err) {
-      // FIX: Add err.message as a fallback so network errors don't get swallowed
-      setError(
-         err.response?.data?.error || 
-         err.message || 
-         'Connection verification failed.'
-      );
+      setError(err.response?.data?.error || 'Connection verification failed.');
     } finally {
       setIsTesting(false);
     }
@@ -107,7 +102,6 @@ const ConnectionManager = ({ onSelectConnection }) => {
       setShowForm(false);
       setEditingId(null);
       loadConnections();
-      setTestSuccess('Connection saved successfully!');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to persist transaction parameters.');
     } finally {
@@ -116,7 +110,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
   };
 
   const handleEditClick = (conn, e) => {
-    e.stopPropagation(); 
+    e.stopPropagation(); // Avoid triggering database row selection triggers
     setError(null);
     setTestSuccess(null);
     setEditingId(conn.id);
@@ -125,7 +119,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
       host: conn.host,
       port: String(conn.port),
       dbUser: conn.db_user,
-      dbPassword: '', 
+      dbPassword: '', // Keep blank unless updating to protect existing records
       databaseName: conn.database_name,
       sslRejectUnauthorized: !!conn.ssl_reject_unauthorized
     });
@@ -139,7 +133,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
       await api.delete(`/connections/${id}`);
       loadConnections();
     } catch (err) {
-      setError('Failed to delete connection.');
+      console.error('Failed to delete connection:', err);
     }
   };
 
@@ -152,12 +146,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
   };
 
   return (
-    <div style={{ maxWidth: '640px', margin: '60px auto', padding: '0 24px', position: 'relative' }}>
-      
-      {/* Toast Pop-ups dynamically rendered here */}
-      <Toast message={error} type="error" onClose={() => setError(null)} />
-      <Toast message={testSuccess} type="success" onClose={() => setTestSuccess(null)} />
-
+    <div style={{ maxWidth: '640px', margin: '60px auto', padding: '0 24px' }}>
       <h1 style={{ fontWeight: 300, fontSize: '2rem', marginBottom: '8px', color: 'var(--text-primary)' }}>
         Your Database Connections
       </h1>
@@ -225,6 +214,18 @@ const ConnectionManager = ({ onSelectConnection }) => {
           <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>
             {editingId ? 'Modify Connection Parameters' : 'New Connection Setup'}
           </h3>
+
+          {error && (
+            <div style={{ color: '#fff', backgroundColor: '#ef4444', padding: '10px', borderRadius: '4px', marginBottom: '12px', fontSize: '0.9rem', lineHeight: '1.4' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {testSuccess && (
+            <div style={{ color: '#fff', backgroundColor: '#22c55e', padding: '10px', borderRadius: '4px', marginBottom: '12px', fontSize: '0.9rem' }}>
+              ✅ {testSuccess}
+            </div>
+          )}
 
           <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Label</label>
           <input style={inputStyle} placeholder="e.g. Production Replica" value={form.label} onChange={e => handleFormChange('label', e.target.value)} />
