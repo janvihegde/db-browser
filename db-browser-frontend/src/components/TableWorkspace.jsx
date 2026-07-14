@@ -5,12 +5,10 @@ import Editor from '@monaco-editor/react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import api from '../services/api';
+import { dbClient } from '../services/dbClient';
 import Toast from './Toast.jsx';
-import { extensionApi } from '../services/extensionBridge';
 
 const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
- const connectionId = connection.id; 
-  
   const [activeTab, setActiveTab] = useState(0);
 
   // Data Preview State
@@ -33,142 +31,97 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [rowCount, setRowCount] = useState(null);
 
-  // Base path for all routes scoped to this database/schema/table
-  const tableBasePath = `/database/${connectionId}/${db}/schemas/${schema}/tables/${table}`;
-
   // Fetch row count whenever the table changes
-  // Fetch row count update
-useEffect(() => {
-  if (!db || !schema || !table) return;
-  setRowCount(null);
-  
-  if (connection.isLocal) {
-    const sql = `SELECT count(*) FROM "${schema}"."${table}";`;
-    extensionApi.runQuery(connection, db, sql)
-      .then(res => setRowCount(res.data[0].count))
-      .catch(console.error);
-  } else {
-    api.get(`${tableBasePath}/count`)
-      .then(res => setRowCount(res.data.rowCount))
-      .catch(console.error);
-  }
-}, [db, schema, table, connection]);
+  useEffect(() => {
+    if (!db || !schema || !table) return;
+    setRowCount(null);
+    dbClient.getRowCount(connectionId, db, schema, table)
+      .then(count => setRowCount(count))
+      .catch(err => console.error("Failed to fetch count:", err));
+  }, [connectionId, db, schema, table]);
 
-  // Fetch data when switching tabs
   // Fetch data when switching tabs
   useEffect(() => {
     if (!db || !schema || !table) return;
 
-    const fetchTabData = async () => {
+    if (activeTab === 0) {
       setIsLoading(true);
-      try {
-        if (activeTab === 0) {
-          // --- DATA PREVIEW ---
-          let data = [];
-          if (connection.isLocal) {
-            const res = await extensionApi.previewTable(connection, db, schema, table);
-            data = res.data || [];
-          } else {
-            const res = await api.get(`${tableBasePath}/preview`);
-            data = res.data?.rows || res.data?.data || res.data || [];
-          }
-          
+      dbClient.previewTable(connectionId, db, schema, table)
+        .then(data => {
+          data = Array.isArray(data) ? data : [];
           setRowData(data);
-          setColumnDefs(data.length > 0 
-            ? Object.keys(data[0]).map(key => ({ field: key, sortable: true, filter: true, resizable: true })) 
-            : []
-          );
 
-        } else if (activeTab === 1) {
-          // --- COLUMNS ---
-          let colsData = [];
-          if (connection.isLocal) {
-            const res = await extensionApi.listColumns(connection, db, schema, table);
-            colsData = res.columns || [];
+          if (data.length > 0) {
+            setColumnDefs(Object.keys(data[0]).map(key => ({
+              field: key, sortable: true, filter: true, resizable: true
+            })));
           } else {
-            const res = await api.get(`${tableBasePath}/columns`);
-            colsData = res.data?.columns || res.data?.data || res.data || [];
+            setColumnDefs([]);
           }
-          setColumnsData(colsData);
+        })
+        .catch(err => console.error("Failed to fetch preview:", err))
+        .finally(() => setIsLoading(false));
 
-        } else if (activeTab === 2) {
-          // --- RELATIONSHIPS ---
-          if (connection.isLocal) {
-            // Raw SQL to fetch outgoing foreign keys
-            const outSql = `
-              SELECT kcu.column_name, ccu.table_schema AS referenced_schema, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
-              FROM information_schema.table_constraints AS tc
-              JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-              JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.table_schema
-              WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = '${schema}' AND tc.table_name = '${table}';
-            `;
-            
-            // Raw SQL to fetch incoming foreign keys
-            const inSql = `
-              SELECT tc.table_schema AS referencing_schema, tc.table_name AS referencing_table, kcu.column_name AS referencing_column, ccu.column_name AS referenced_column
-              FROM information_schema.table_constraints AS tc
-              JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-              JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.table_schema
-              WHERE tc.constraint_type = 'FOREIGN KEY' AND ccu.table_schema = '${schema}' AND ccu.table_name = '${table}';
-            `;
+    } else if (activeTab === 1) {
+      setIsLoading(true);
+      dbClient.listColumns(connectionId, db, schema, table)
+        .then(colsData => {
+          setColumnsData(Array.isArray(colsData) ? colsData : []);
+        })
+        .catch(err => console.error("Failed to fetch columns:", err))
+        .finally(() => setIsLoading(false));
 
-            const [outRes, inRes] = await Promise.all([
-              extensionApi.runQuery(connection, db, outSql),
-              extensionApi.runQuery(connection, db, inSql)
-            ]);
-
-            setRelationships({ outgoing: outRes.data || [], incoming: inRes.data || [] });
-          } else {
-            const res = await api.get(`${tableBasePath}/relationships`);
-            setRelationships({
-              outgoing: res.data.outgoing || [],
-              incoming: res.data.incoming || []
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch tab data:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTabData();
-  }, [db, schema, table, activeTab, connection]);
+    } else if (activeTab === 2) {
+      setIsLoading(true);
+      dbClient.getRelationships(connectionId, db, schema, table)
+        .then(data => {
+          setRelationships({
+            outgoing: data.outgoing || [],
+            incoming: data.incoming || []
+          });
+        })
+        .catch(err => console.error("Failed to fetch relationships:", err))
+        .finally(() => setIsLoading(false));
+    }
+  }, [connectionId, db, schema, table, activeTab]);
 
   // Handle SQL Execution (Run Query)
   const handleRunQuery = async () => {
-  if (!sqlQuery.trim()) return;
-  setIsExecuting(true);
-  setQueryError(null);
+    if (!sqlQuery.trim()) return;
 
-  try {
-    let data = [];
-    if (connection.isLocal) {
-      // 🚀 Run locally
-      const response = await extensionApi.runQuery(connection, db, sqlQuery);
-      data = response.data;
-    } else {
-      // ☁️ Run via cloud
-      const response = await api.post(`/database/${connection.id}/${db}/query`, { sql: sqlQuery });
-      data = response.data?.rows || response.data?.data || response.data || [];
-    }
+    setIsExecuting(true);
+    setQueryError(null);
 
-    setQueryResults(data);
-    if (data.length > 0) {
-      setQueryColumnDefs(Object.keys(data[0]).map(key => ({ field: key, sortable: true, filter: true, resizable: true })));
+    try {
+      const data = await dbClient.runQuery(connectionId, db, sqlQuery);
+      const rows = Array.isArray(data) ? data : [];
+
+      setQueryResults(rows);
+
+      if (rows.length > 0) {
+        setQueryColumnDefs(Object.keys(rows[0]).map(key => ({
+          field: key, sortable: true, filter: true, resizable: true
+        })));
+      } else {
+        setQueryColumnDefs([]);
+      }
+    } catch (err) {
+      console.error("Query execution error:", err);
+      setQueryError(err.response?.data?.error || err.message || "An error occurred.");
+      setQueryResults([]);
+      setQueryColumnDefs([]);
+    } finally {
+      setIsExecuting(false);
     }
-  } catch (err) {
-    setQueryError(err.message || "An error occurred.");
-    setQueryResults([]);
-  } finally {
-    setIsExecuting(false);
-  }
-};
+  };
 
   // Trigger CSV Download
   const handleExportCSV = () => {
     if (!sqlQuery.trim()) return;
+    if (dbClient.isLocalId(connectionId)) {
+      setQueryError('CSV export isn\'t supported yet for local connections.');
+      return;
+    }
     const encodedQuery = encodeURIComponent(sqlQuery);
     const base = api.defaults.baseURL || '';
     const exportUrl = `${base}/database/${connectionId}/${db}/query/export?sql=${encodedQuery}`;

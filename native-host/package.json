@@ -1,9 +1,15 @@
 {
   "name": "db-browser-native-host",
-  "version": "1.0.0",
-  "description": "Native messaging host for the DB Browser extension",
-  "main": "native-host.js",
+  "version": "0.1.0",
+  "description": "DB Browser native messaging host — opens local Postgres connections on behalf of the browser extension",
+  "main": "index.js",
+  "bin": {
+    "db-browser-native-host": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
-    "pg": "^8.11.0"
+    "pg": "^8.22.0"
   }
 }
