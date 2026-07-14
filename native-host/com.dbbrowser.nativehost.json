@@ -1,0 +1,9 @@
+{
+  "name": "com.dbbrowser.nativehost",
+  "description": "DB Browser native messaging host — opens local database connections",
+  "path": "REPLACED_BY_INSTALLER.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://ndhijdclhjlpfbafkndaedecehhlcoae/"
+  ]
+}

@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import TableWorkspace from './components/TableWorkspace.jsx';
 import ConnectionManager from './components/ConnectionManager.jsx';
 import api from './services/api';
+import { dbClient } from './services/dbClient';
 
 function App() {
   // Connection State — which saved AWS RDS connection is active
@@ -40,9 +41,9 @@ function App() {
   useEffect(() => {
     if (selectedConnectionId && selectedDb && selectedSchema) {
       setIsLoadingTables(true);
-      api.get(`/database/${selectedConnectionId}/${selectedDb}/schemas/${selectedSchema}/tables`)
-        .then(response => {
-          setTables(response.data.tables || []);
+      dbClient.listTables(selectedConnectionId, selectedDb, selectedSchema)
+        .then(tables => {
+          setTables(tables);
           setIsLoadingTables(false);
         })
         .catch(err => {

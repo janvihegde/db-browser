@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "DB Browser Local Bridge",
+  "version": "1.0.0",
+  "description": "Lets db-browser-one.vercel.app talk to databases on your own machine.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoO4eiMNHW+Bt+ckOMG9rDohxTAxUGPXj5tHSxqkDmywQHb+ds64KiDthLNChOAs6AVzxgIug06fobw4DJDpHGJsE5whfX79XpB3JCaTgwEDSMevbfIfR1SMndN727y3NjvTUD/imeUC3w0EqJiXt1wOkfrN80TpVSYU8WJjSTVQrRAl4jqrlU3vGEQY62iOBIAP/JKhn3trLFAumjYyqdRuQKtZX0lZw0zH6WXvlRht1vFlUP1+ayW4jbfkG+5c5LBjdXp89kT6KEjToRIuTTSHQryPiu+XeNiZt16FfMV14/nvqJsV6/H7+41jHPFJMVMaBaHUpZXuY08UDRikEdwIDAQAB",
+  "permissions": ["nativeMessaging"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://db-browser-one.vercel.app/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

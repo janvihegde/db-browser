@@ -1,0 +1,9 @@
+{
+  "name": "db-browser-native-host",
+  "version": "1.0.0",
+  "description": "Native messaging host for the DB Browser extension",
+  "main": "native-host.js",
+  "dependencies": {
+    "pg": "^8.11.0"
+  }
+}

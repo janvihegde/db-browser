@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { dbClient } from '../services/dbClient';
+import { extensionApi } from '../services/extensionBridge';
 
 const inputStyle = {
   width: '100%',
@@ -31,15 +32,16 @@ const ConnectionManager = ({ onSelectConnection }) => {
     dbUser: '',
     dbPassword: '',
     databaseName: '',
-    sslRejectUnauthorized: false
+    sslRejectUnauthorized: false,
+    isLocal: false
   };
 
   const [form, setForm] = useState(initialFormState);
 
   const loadConnections = () => {
     setIsLoading(true);
-    api.get('/connections')
-      .then(res => setConnections(res.data.connections || []))
+    dbClient.listConnections()
+      .then(list => setConnections(list))
       .catch(err => console.error('Failed to load connections:', err))
       .finally(() => setIsLoading(false));
   };
@@ -68,10 +70,10 @@ const ConnectionManager = ({ onSelectConnection }) => {
 
     setIsTesting(true);
     try {
-      const res = await api.post('/connections/test', form);
-      setTestSuccess(res.data.message || 'Connection test successful!');
+      const res = await dbClient.testConnection(form, form.isLocal);
+      setTestSuccess(res.message || 'Connection test successful!');
     } catch (err) {
-      setError(err.response?.data?.error || 'Connection verification failed.');
+      setError(err.response?.data?.error || err.message || 'Connection verification failed.');
     } finally {
       setIsTesting(false);
     }
@@ -93,17 +95,13 @@ const ConnectionManager = ({ onSelectConnection }) => {
 
     setIsSaving(true);
     try {
-      if (editingId) {
-        await api.put(`/connections/${editingId}`, form);
-      } else {
-        await api.post('/connections', form);
-      }
+      await dbClient.saveConnection(form, editingId, form.isLocal);
       setForm(initialFormState);
       setShowForm(false);
       setEditingId(null);
       loadConnections();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to persist transaction parameters.');
+      setError(err.response?.data?.error || err.message || 'Failed to persist transaction parameters.');
     } finally {
       setIsSaving(false);
     }
@@ -121,7 +119,8 @@ const ConnectionManager = ({ onSelectConnection }) => {
       dbUser: conn.db_user,
       dbPassword: '', // Keep blank unless updating to protect existing records
       databaseName: conn.database_name,
-      sslRejectUnauthorized: !!conn.ssl_reject_unauthorized
+      sslRejectUnauthorized: !!conn.ssl_reject_unauthorized,
+      isLocal: !!conn.isLocal
     });
     setShowForm(true);
   };
@@ -130,7 +129,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
     e.stopPropagation();
     if (!window.confirm('Delete this saved connection? This cannot be undone.')) return;
     try {
-      await api.delete(`/connections/${id}`);
+      await dbClient.deleteConnection(id);
       loadConnections();
     } catch (err) {
       console.error('Failed to delete connection:', err);
@@ -178,7 +177,14 @@ const ConnectionManager = ({ onSelectConnection }) => {
               }}
             >
               <div>
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{conn.label}</div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {conn.label}
+                  {conn.isLocal && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent-purple)', border: '1px solid var(--accent-purple)', borderRadius: '10px', padding: '2px 8px' }}>
+                      Local
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {conn.db_user}@{conn.host}:{conn.port} / {conn.database_name}
                 </div>
@@ -246,6 +252,21 @@ const ConnectionManager = ({ onSelectConnection }) => {
 
           <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Database Name</label>
           <input style={inputStyle} placeholder="postgres" value={form.databaseName} onChange={e => handleFormChange('databaseName', e.target.value)} />
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+            <input
+              type="checkbox"
+              checked={form.isLocal}
+              disabled={!!editingId}
+              onChange={e => handleFormChange('isLocal', e.target.checked)}
+            />
+            This database is on my own machine (uses the browser extension)
+          </label>
+          {form.isLocal && !extensionApi.isAvailable() && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '12px', padding: '8px 10px', backgroundColor: 'var(--bg-page)', borderRadius: '4px' }}>
+              Extension not detected yet. Make sure the DB Browser Local Bridge extension is installed and enabled, then reload this page.
+            </div>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
             <input type="checkbox" checked={form.sslRejectUnauthorized} onChange={e => handleFormChange('sslRejectUnauthorized', e.target.checked)} />

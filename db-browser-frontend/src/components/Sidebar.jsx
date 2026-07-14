@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { dbClient } from '../services/dbClient';
 
 const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelectSchema, onSelectTable }) => {
   const [databases, setDatabases] = useState([]);
@@ -14,16 +14,16 @@ const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelec
   // Initial load: Fetch databases
   useEffect(() => {
     if (!connectionId) return;
-    api.get(`/database/${connectionId}/list`)
-      .then(res => setDatabases(res.data.databases || []))
+    dbClient.listDatabases(connectionId)
+      .then(dbs => setDatabases(dbs))
       .catch(err => console.error("Failed to fetch DBs", err));
   }, [connectionId]);
 
   // Fetch schemas when a DB is expanded
   useEffect(() => {
     if (expandedDb && connectionId) {
-      api.get(`/database/${connectionId}/${expandedDb}/schemas`)
-        .then(res => setSchemas(res.data.schemas || []))
+      dbClient.listSchemas(connectionId, expandedDb)
+        .then(schemas => setSchemas(schemas))
         .catch(err => console.error("Failed to fetch schemas", err));
     }
   }, [expandedDb, connectionId]);
@@ -37,8 +37,8 @@ const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelec
 
     setIsSearching(true);
     const timer = setTimeout(() => {
-      api.get(`/database/${connectionId}/${selectedDb}/search`, { params: { q: searchTerm.trim() } })
-        .then(res => setSearchResults(res.data))
+      dbClient.search(connectionId, selectedDb, searchTerm.trim())
+        .then(res => setSearchResults(res))
         .catch(err => {
           console.error("Search failed", err);
           setSearchResults({ tables: [], columns: [] });
