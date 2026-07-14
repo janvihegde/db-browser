@@ -3,6 +3,7 @@
   "name": "DB Browser Local Connector",
   "version": "0.1.0",
   "description": "Lets the DB Browser web app talk to a local PostgreSQL database via a native messaging host running on your machine.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoO4eiMNHW+Bt+ckOMG9rDohxTAxUGPXj5tHSxqkDmywQHb+ds64KiDthLNChOAs6AVzxgIug06fobw4DJDpHGJsE5whfX79XpB3JCaTgwEDSMevbfIfR1SMndN727y3NjvTUD/imeUC3w0EqJiXt1wOkfrN80TpVSYU8WJjSTVQrRAl4jqrlU3vGEQY62iOBIAP/JKhn3trLFAumjYyqdRuQKtZX0lZw0zH6WXvlRht1vFlUP1+ayW4jbfkG+5c5LBjdXp89kT6KEjToRIuTTSHQryPiu+XeNiZt16FfMV14/nvqJsV6/H7+41jHPFJMVMaBaHUpZXuY08UDRikEdwIDAQAB",
 
   "permissions": [
     "nativeMessaging"
@@ -16,7 +17,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://YOUR-APP.vercel.app/*",
+        "https://db-browser-one.vercel.app/*",
         "http://localhost:5173/*"
       ],
       "js": ["content.js"],

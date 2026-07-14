@@ -101,20 +101,26 @@ Select the extension folder located inside this repository directory.
 
 Note: You will now see the extension DB Browser Local Connector active in your extension list.
 
-Step 3: Run the React Web Application
-Open a terminal window and enter the frontend package workspace:
+⚠️ Important: `extension/manifest.json` includes a `"key"` field. This pins
+the extension to one fixed ID (`ndhijdclhjlpfbafkndaedecehhlcoae`) so it
+matches `native-host/com.dbbrowser.nativehost.json`'s `allowed_origins`.
+Without it, "Load unpacked" assigns a random ID per install, and the native
+host will silently refuse every connection. Don't remove or regenerate this
+field unless you also update the native host manifest to match.
 
-Bash
-cd db-browser-frontend
-Install client-side dependencies:
+Step 3: Open the DB Browser Web App
+No need to run the frontend yourself — it's already hosted at:
 
-Bash
-npm install
-Boot your local Vite development engine:
+https://db-browser-one.vercel.app
 
-Bash
-npm run dev
-Open the printed localhost URL in your browser (typically http://localhost:5173/).
+Just open that URL in the same browser where you installed the extension
+(Step 2). The extension only activates on that exact domain, so make sure
+you're using the hosted link, not a different preview URL.
+
+(If you're doing frontend development work and need to test against a local
+build instead, `cd db-browser-frontend && npm install && npm run dev` still
+works — the extension is also allowed to run on `http://localhost:5173/*`
+for that case.)
 
 🔌 How to Use the Local Connection Feature
 Open the DB Browser web app interface in your browser.
