@@ -29,16 +29,19 @@ function getOrCreateNativePort(tabId) {
 
   port.onMessage.addListener((message) => {
     const pending = pendingByTab.get(tabId);
-    const sendResponse = pending?.get(message.id);
-    if (!sendResponse) return; // unmatched or late response, drop it
-    pending.delete(message.id);
+    
+    // 1. Match using requestId instead of id
+    const sendResponse = pending?.get(message.requestId);
+    if (!sendResponse) return; 
+    pending.delete(message.requestId);
 
+    // 2. Translate native host response into the format the content script expects
     sendResponse({
-      ok: message.ok,
-      data: message.data,
-      error: message.error,
+      ok: !message.error,        // If there's no error, it's successful
+      data: message.result,      // native-host uses 'result'
+      error: message.error,      // native-host uses 'error' string
     });
-  });
+  });   
 
   port.onDisconnect.addListener(() => {
     const err = chrome.runtime.lastError?.message || 'Native host disconnected';
@@ -64,7 +67,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   try {
     const port = getOrCreateNativePort(tabId);
     pendingByTab.get(tabId).set(id, sendResponse);
-    port.postMessage({ id, type, payload });
+    
+    // ✅ Translate the page structure into what native-host destructures
+    port.postMessage({ 
+      requestId: id, 
+      type: type, 
+      connection: payload?.connection,
+      params: payload?.params || {}
+    });
+    
   } catch (err) {
     sendResponse({ ok: false, error: err?.message || 'Failed to reach native host' });
     return false;
