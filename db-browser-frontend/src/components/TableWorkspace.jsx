@@ -94,7 +94,7 @@ const dynamicColumns = Object.keys(data[0]).map(key => ({
   headerName: key,
   // Add the value formatter here to apply to all columns
   valueFormatter: formatToYYMMDD, 
-  filter: false // (Keeping the search filter off as we did previously)
+  filter: true // (Keeping the search filter off as we did previously)
 }));
 
 // Then set your columnDefs state
