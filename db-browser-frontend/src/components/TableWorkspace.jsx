@@ -32,10 +32,8 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   const [rowCount, setRowCount] = useState(null);
 
   // Helper function to format dates
-const formatToYYMMDD = (params) => {
-  if (!params.value) return params.value;
 
- // Helper function to format dates to YYYY-MM-DD
+
  // Helper function to format dates to YYYY-MM-DD
   const formatToYYMMDD = (params) => {
     if (!params.value) return params.value;
