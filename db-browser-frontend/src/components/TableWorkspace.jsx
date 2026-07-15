@@ -91,8 +91,10 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 const dynamicColumns = Object.keys(data[0]).map(key => ({
   field: key,
   headerName: key,
+  
   // Add the value formatter here to apply to all columns
   valueFormatter: formatToYYMMDD, 
+  filterValueGetter: (params) => formatToYYMMDD({ value: params.data ? params.data[key] : null }),
   filter: true // (Keeping the search filter off as we did previously)
 }));
 
@@ -143,12 +145,13 @@ setColumnDefs(dynamicColumns);
       if (rows.length > 0) {
         // UPDATE IS HERE: Apply the formatter and turn off the filter
         setQueryColumnDefs(Object.keys(rows[0]).map(key => ({
-          field: key, 
+         field: key, 
           headerName: key,
           sortable: true, 
           filter: true, 
           resizable: true,
-          valueFormatter: formatToYYMMDD // Apply the date fix to query results!
+          valueFormatter: formatToYYMMDD,
+          filterValueGetter: (params) => formatToYYMMDD({ value: params.data ? params.data[key] : null })
         })));
       } else {
         setQueryColumnDefs([]);
