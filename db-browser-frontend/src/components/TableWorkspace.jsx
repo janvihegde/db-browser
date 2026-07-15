@@ -31,6 +31,30 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [rowCount, setRowCount] = useState(null);
 
+  // Helper function to format dates
+const formatToYYMMDD = (params) => {
+  if (!params.value) return params.value;
+
+  // Check if the value is a string that starts with a standard YYYY-MM-DD date pattern
+  const isDateString = typeof params.value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(params.value);
+  
+  if (isDateString) {
+    const date = new Date(params.value);
+    
+    // Ensure it's a valid date before formatting
+    if (!isNaN(date.getTime())) {
+      const yy = String(date.getFullYear()); 
+      const mm = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+      const dd = String(date.getDate()).padStart(2, '0');
+      
+      return `${yy}-${mm}-${dd}`;
+    }
+  }
+  
+  // Return original value if it's not a date
+  return params.value;
+};
+
   // Fetch row count whenever the table changes
   useEffect(() => {
     if (!db || !schema || !table) return;
@@ -52,11 +76,17 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
           setRowData(data);
 
           if (data.length > 0) {
-            setColumnDefs(Object.keys(data[0]).map(key => ({
-              field: key, sortable: true, filter: true, resizable: true
-            })));
-          } else {
-            setColumnDefs([]);
+           // Find where you map your column definitions (it likely looks something like this):
+const dynamicColumns = Object.keys(data[0]).map(key => ({
+  field: key,
+  headerName: key,
+  // Add the value formatter here to apply to all columns
+  valueFormatter: formatToYYMMDD, 
+  filter: false // (Keeping the search filter off as we did previously)
+}));
+
+// Then set your columnDefs state
+setColumnDefs(dynamicColumns);
           }
         })
         .catch(err => console.error("Failed to fetch preview:", err))
@@ -86,6 +116,7 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   }, [connectionId, db, schema, table, activeTab]);
 
   // Handle SQL Execution (Run Query)
+  // Handle SQL Execution (Run Query)
   const handleRunQuery = async () => {
     if (!sqlQuery.trim()) return;
 
@@ -99,8 +130,14 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
       setQueryResults(rows);
 
       if (rows.length > 0) {
+        // UPDATE IS HERE: Apply the formatter and turn off the filter
         setQueryColumnDefs(Object.keys(rows[0]).map(key => ({
-          field: key, sortable: true, filter: true, resizable: true
+          field: key, 
+          headerName: key,
+          sortable: true, 
+          filter: false, // Keeping it clean for the Truelift brand
+          resizable: true,
+          valueFormatter: formatToYYMMDD // Apply the date fix to query results!
         })));
       } else {
         setQueryColumnDefs([]);
@@ -114,7 +151,6 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
       setIsExecuting(false);
     }
   };
-
   // Trigger CSV Download
   const handleExportCSV = () => {
     if (!sqlQuery.trim()) return;
