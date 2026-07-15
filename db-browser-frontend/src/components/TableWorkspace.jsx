@@ -35,37 +35,44 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 
 
  // Helper function to format dates to YYYY-MM-DD
-  const formatToYYMMDD = (params) => {
-    if (!params.value) return params.value;
+  // Helper function to intercept and format data BEFORE AG Grid sees it
+  const sanitizeData = (rows) => {
+    if (!Array.isArray(rows)) return [];
 
-    const val = params.value;
+    return rows.map(row => {
+      const cleanedRow = { ...row };
 
-    // 1. Check if it's a standard ISO string (e.g., "2026-07-15T12:00:00.000Z")
-    if (typeof val === 'string' && val.includes('T')) {
-      const datePart = val.split('T')[0];
-      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart; // Returns "2026-07-15"
-    }
+      Object.keys(cleanedRow).forEach(key => {
+        const val = cleanedRow[key];
+        if (!val) return; // Skip nulls
 
-    // 2. Check if it's a standard SQL string (e.g., "2026-07-15 12:00:00")
-    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(val)) {
-      return val.split(' ')[0]; // Returns "2026-07-15"
-    }
+        // 1. ISO String check (e.g., "2026-07-15T12:00:00.000Z")
+        if (typeof val === 'string' && val.includes('T')) {
+          const datePart = val.split('T')[0];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            cleanedRow[key] = datePart;
+            return;
+          }
+        }
 
-    // 3. Ultimate Fallback: Ask JavaScript to forcefully parse it
-    // (We make sure it's not a plain number, so we don't accidentally turn IDs into dates)
-    const date = new Date(val);
-    if (!isNaN(date.getTime()) && typeof val !== 'number') {
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      
-      return `${yyyy}-${mm}-${dd}`;
-    }
+        // 2. SQL String check (e.g., "2026-07-15 12:00:00")
+        if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(val)) {
+          cleanedRow[key] = val.split(' ')[0];
+          return;
+        }
 
-    // If it's completely unidentifiable as a date, return the original text
-    return val;
+        // 3. JavaScript Date object check
+        if (val instanceof Date) {
+          const yyyy = val.getFullYear();
+          const mm = String(val.getMonth() + 1).padStart(2, '0');
+          const dd = String(val.getDate()).padStart(2, '0');
+          cleanedRow[key] = `${yyyy}-${mm}-${dd}`;
+        }
+      });
+
+      return cleanedRow;
+    });
   };
-
   // Fetch row count whenever the table changes
   useEffect(() => {
     if (!db || !schema || !table) return;
@@ -83,23 +90,18 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
       setIsLoading(true);
       dbClient.previewTable(connectionId, db, schema, table)
         .then(data => {
-          data = Array.isArray(data) ? data : [];
-          setRowData(data);
+          // INTERCEPT AND CLEAN THE DATA HERE
+          const cleanedRows = sanitizeData(data);
+          setRowData(cleanedRows);
 
-          if (data.length > 0) {
-           // Find where you map your column definitions (it likely looks something like this):
-const dynamicColumns = Object.keys(data[0]).map(key => ({
-  field: key,
-  headerName: key,
-  
-  // Add the value formatter here to apply to all columns
-  valueFormatter: formatToYYMMDD, 
-  filterValueGetter: (params) => formatToYYMMDD({ value: params.data ? params.data[key] : null }),
-  filter: true // (Keeping the search filter off as we did previously)
-}));
-
-// Then set your columnDefs state
-setColumnDefs(dynamicColumns);
+          if (cleanedRows.length > 0) {
+            // Keep the columns super simple! No formatters needed anymore.
+            const dynamicColumns = Object.keys(cleanedRows[0]).map(key => ({
+              field: key,
+              headerName: key,
+              filter: true 
+            }));
+            setColumnDefs(dynamicColumns);
           }
         })
         .catch(err => console.error("Failed to fetch preview:", err))
@@ -138,25 +140,25 @@ setColumnDefs(dynamicColumns);
 
     try {
       const data = await dbClient.runQuery(connectionId, db, sqlQuery);
-      const rows = Array.isArray(data) ? data : [];
+      
+      // INTERCEPT AND CLEAN THE DATA HERE
+      const cleanedRows = sanitizeData(data);
+      setQueryResults(cleanedRows);
 
-      setQueryResults(rows);
-
-      if (rows.length > 0) {
-        // UPDATE IS HERE: Apply the formatter and turn off the filter
-        setQueryColumnDefs(Object.keys(rows[0]).map(key => ({
-         field: key, 
+      if (cleanedRows.length > 0) {
+        // Keep the columns super simple!
+        setQueryColumnDefs(Object.keys(cleanedRows[0]).map(key => ({
+          field: key, 
           headerName: key,
           sortable: true, 
           filter: true, 
-          resizable: true,
-          valueFormatter: formatToYYMMDD,
-          filterValueGetter: (params) => formatToYYMMDD({ value: params.data ? params.data[key] : null })
+          resizable: true
         })));
       } else {
         setQueryColumnDefs([]);
       }
     } catch (err) {
+      
       console.error("Query execution error:", err);
       setQueryError(err.response?.data?.error || err.message || "An error occurred.");
       setQueryResults([]);
