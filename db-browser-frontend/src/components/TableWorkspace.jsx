@@ -35,21 +35,33 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 const formatToYYMMDD = (params) => {
   if (!params.value) return params.value;
 
-  // Check if the value is a string that starts with a standard YYYY-MM-DD date pattern
-  const isDateString = typeof params.value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(params.value);
-  
-  if (isDateString) {
-    const date = new Date(params.value);
-    
-    // Ensure it's a valid date before formatting
-    if (!isNaN(date.getTime())) {
-      const yy = String(date.getFullYear()); 
-      const mm = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+ // Helper function to format dates to YYYY-MM-DD
+  const formatToYYMMDD = (params) => {
+    if (!params.value) return params.value;
+
+    let date;
+
+    // 1. Check if the database driver already parsed it into a JavaScript Date object
+    if (params.value instanceof Date) {
+      date = params.value;
+    } 
+    // 2. Or, check if it is an ISO date string
+    else if (typeof params.value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(params.value)) {
+      date = new Date(params.value);
+    }
+
+    // If we successfully captured a valid date, format it
+    if (date && !isNaN(date.getTime())) {
+      const yyyy = date.getFullYear(); // REMOVED the .slice(-2) to keep all 4 digits
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
       const dd = String(date.getDate()).padStart(2, '0');
       
-      return `${yy}-${mm}-${dd}`;
+      return `${yyyy}-${mm}-${dd}`;
     }
-  }
+    
+    // Return original value if it's not a recognized date format
+    return params.value;
+  };
   
   // Return original value if it's not a date
   return params.value;
