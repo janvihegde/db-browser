@@ -147,7 +147,7 @@ setColumnDefs(dynamicColumns);
           field: key, 
           headerName: key,
           sortable: true, 
-          filter: false, // Keeping it clean for the Truelift brand
+          filter: true, 
           resizable: true,
           valueFormatter: formatToYYMMDD // Apply the date fix to query results!
         })));
