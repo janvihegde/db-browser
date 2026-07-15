@@ -36,36 +36,37 @@ const formatToYYMMDD = (params) => {
   if (!params.value) return params.value;
 
  // Helper function to format dates to YYYY-MM-DD
+ // Helper function to format dates to YYYY-MM-DD
   const formatToYYMMDD = (params) => {
     if (!params.value) return params.value;
 
-    let date;
+    const val = params.value;
 
-    // 1. Check if the database driver already parsed it into a JavaScript Date object
-    if (params.value instanceof Date) {
-      date = params.value;
-    } 
-    // 2. Or, check if it is an ISO date string
-    else if (typeof params.value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(params.value)) {
-      date = new Date(params.value);
+    // 1. Check if it's a standard ISO string (e.g., "2026-07-15T12:00:00.000Z")
+    if (typeof val === 'string' && val.includes('T')) {
+      const datePart = val.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart; // Returns "2026-07-15"
     }
 
-    // If we successfully captured a valid date, format it
-    if (date && !isNaN(date.getTime())) {
-      const yyyy = date.getFullYear(); // REMOVED the .slice(-2) to keep all 4 digits
+    // 2. Check if it's a standard SQL string (e.g., "2026-07-15 12:00:00")
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(val)) {
+      return val.split(' ')[0]; // Returns "2026-07-15"
+    }
+
+    // 3. Ultimate Fallback: Ask JavaScript to forcefully parse it
+    // (We make sure it's not a plain number, so we don't accidentally turn IDs into dates)
+    const date = new Date(val);
+    if (!isNaN(date.getTime()) && typeof val !== 'number') {
+      const yyyy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
       const dd = String(date.getDate()).padStart(2, '0');
       
       return `${yyyy}-${mm}-${dd}`;
     }
-    
-    // Return original value if it's not a recognized date format
-    return params.value;
+
+    // If it's completely unidentifiable as a date, return the original text
+    return val;
   };
-  
-  // Return original value if it's not a date
-  return params.value;
-};
 
   // Fetch row count whenever the table changes
   useEffect(() => {
