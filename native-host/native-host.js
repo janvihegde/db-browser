@@ -9,6 +9,9 @@
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
+types.setTypeParser(1114, (val) => val); // TIMESTAMP
+types.setTypeParser(1184, (val) => val); // TIMESTAMPTZ
+types.setTypeParser(1082, (val) => val); // DATE
 // ---------------------------------------------------------------------------
 // Chrome native messaging framing
 // ---------------------------------------------------------------------------

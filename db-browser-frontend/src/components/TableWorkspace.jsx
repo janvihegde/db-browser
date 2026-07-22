@@ -36,6 +36,7 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 
  // Helper function to format dates to YYYY-MM-DD
   // Helper function to intercept and format data BEFORE AG Grid sees it
+  // Helper function to intercept and format data BEFORE AG Grid sees it
   const sanitizeData = (rows) => {
     if (!Array.isArray(rows)) return [];
 
@@ -46,11 +47,15 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
         const val = cleanedRow[key];
         if (!val) return; // Skip nulls
 
-        // 1. ISO String check (e.g., "2026-07-15T12:00:00.000Z")
+        // 1. ISO String check (e.g., "2025-12-31T18:30:00.000Z")
         if (typeof val === 'string' && val.includes('T')) {
-          const datePart = val.split('T')[0];
-          if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-            cleanedRow[key] = datePart;
+          const dateObj = new Date(val);
+          // Verify it parsed correctly before updating
+          if (!isNaN(dateObj.getTime())) {
+            const yyyy = dateObj.getFullYear(); // Correctly grabs the local year (e.g., 2026)
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            cleanedRow[key] = `${yyyy}-${mm}-${dd}`;
             return;
           }
         }
