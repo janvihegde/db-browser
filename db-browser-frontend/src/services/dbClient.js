@@ -78,6 +78,9 @@ export const dbClient = {
 
   async testConnection(form, isLocal) {
     if (isLocal) {
+      if (!(await extensionApi.waitUntilAvailable(1000))) {
+        throw new Error('Extension not detected. Install the DB Browser Local Bridge extension on this computer first, then reload this page.');
+      }
       return extensionApi.testConnection(form);
     }
     const res = await api.post('/connections/test', form);

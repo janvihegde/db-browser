@@ -32,6 +32,26 @@ function isExtensionAvailable() {
   return extensionDetected;
 }
 
+// Polls briefly instead of checking once - the extension's "ready" ping
+// fires asynchronously right after page load, so a single synchronous
+// check can catch it a few milliseconds too early and wrongly report
+// "not installed" even when it genuinely is.
+function waitUntilAvailable(timeoutMs = 1000) {
+  if (extensionDetected) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const interval = setInterval(() => {
+      if (extensionDetected) {
+        clearInterval(interval);
+        resolve(true);
+      } else if (Date.now() - started > timeoutMs) {
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 50);
+  });
+}
+
 function callExtension(type, connection, params = {}) {
   return new Promise((resolve, reject) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -54,6 +74,7 @@ function callExtension(type, connection, params = {}) {
 
 export const extensionApi = {
   isAvailable: isExtensionAvailable,
+  waitUntilAvailable,
   testConnection: (connection) => callExtension('test', connection),
   listDatabases: (connection) => callExtension('listDatabases', connection),
   listSchemas: (connection, db) => callExtension('listSchemas', connection, { db }),

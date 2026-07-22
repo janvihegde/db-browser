@@ -71,7 +71,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
     setIsTesting(true);
     try {
       const res = await dbClient.testConnection(form, form.isLocal);
-      setTestSuccess(res.message || 'Connection test successful!');
+      setTestSuccess(res?.message || 'Connection test successful!');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Connection verification failed.');
     } finally {

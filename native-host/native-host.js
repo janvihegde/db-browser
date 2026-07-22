@@ -7,6 +7,7 @@
 // "localhost" in a connection means the user's own database, correctly.
 
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // Chrome native messaging framing
@@ -46,14 +47,19 @@ function sendMessage(obj) {
 }
 
 // ---------------------------------------------------------------------------
-// Connection pooling — one pool per unique host+port+user+database, reused
-// across requests for the lifetime of this process.
+// Connection pooling — one pool per unique host+port+user+password+database,
+// reused across requests for the lifetime of this process. The password is
+// hashed (not stored in plaintext in the key) purely so that editing just
+// the password still produces a different cache key - otherwise a password
+// change would silently keep using a pool opened with the old password
+// until this process happens to restart.
 // ---------------------------------------------------------------------------
 
 const pools = new Map();
 
 function getPool(conn, databaseName) {
-  const key = `${conn.host}:${conn.port}:${conn.dbUser}:${databaseName}`;
+  const passwordHash = crypto.createHash('sha256').update(conn.dbPassword || '').digest('hex').slice(0, 16);
+  const key = `${conn.host}:${conn.port}:${conn.dbUser}:${passwordHash}:${databaseName}`;
   if (!pools.has(key)) {
     pools.set(key, new Pool({
       host: conn.host,
