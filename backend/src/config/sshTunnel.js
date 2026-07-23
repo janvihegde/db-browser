@@ -1,5 +1,34 @@
 const { EventEmitter } = require('events');
+const net = require('net');
 const { Client } = require('ssh2');
+
+// ---------------------------------------------------------------------------
+// Quick "is anything listening here" check, used before attempting a real
+// SSH handshake. This is deliberately just a raw TCP connect+close — it
+// can't tell us the listener is actually sshd (vs. some other service on
+// the same port), but it lets us fail fast with a clear message ("nothing
+// is listening") instead of waiting out the full SSH readyTimeout and
+// surfacing a more confusing low-level error.
+// ---------------------------------------------------------------------------
+function checkTcpReachable(host, port, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish(true));
+    socket.once('timeout', () => finish(false));
+    socket.once('error', () => finish(false));
+    socket.connect(port, host);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Why this file exists
@@ -165,4 +194,4 @@ function adHocTunnelStreamFactory(bastionConfig, dbHost, dbPort) {
   };
 }
 
-module.exports = { persistentTunnelStreamFactory, adHocTunnelStreamFactory };
+module.exports = { persistentTunnelStreamFactory, adHocTunnelStreamFactory, checkTcpReachable };

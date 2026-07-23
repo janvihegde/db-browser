@@ -4,9 +4,34 @@ const { getAppPool, getUserPool } = require('../config/db');
 const { encrypt } = require('../utils/crypto');
 const { requireAuth } = require('../middleware/auth');
 const { Pool } = require('pg'); // Required for standalone test connections
-const { adHocTunnelStreamFactory } = require('../config/sshTunnel');
+const { adHocTunnelStreamFactory, checkTcpReachable } = require('../config/sshTunnel');
 
 router.use(requireAuth);
+
+const LOCAL_SSH_PORT = 22;
+
+function isLocalhost(host) {
+  return !!host && host.trim().toLowerCase() === 'localhost';
+}
+
+// When the user types "localhost" as the DB host, we tunnel through SSH to
+// that same machine rather than connecting to Postgres directly — and we
+// reuse the DB username/password as the SSH login instead of asking for
+// separate bastion credentials. This reuses the existing bastion tunnel
+// plumbing unchanged; it just derives the bastion_* fields automatically
+// instead of taking them from the request body.
+function resolveTunnelFields({ host, dbUser, dbPassword, bastionHost, bastionPort, bastionUser, bastionPassword }) {
+  if (isLocalhost(host)) {
+    return {
+      bastionHost: 'localhost',
+      bastionPort: LOCAL_SSH_PORT,
+      bastionUser: dbUser,
+      bastionPassword: dbPassword, // may be '' on update-without-password-change; handled same as before
+      isLocalSsh: true
+    };
+  }
+  return { bastionHost, bastionPort, bastionUser, bastionPassword, isLocalSsh: false };
+}
 
 // GET /api/connections — list the current user's saved connections
 router.get('/', async (req, res) => {
@@ -37,9 +62,25 @@ router.post('/test', async (req, res) => {
     return res.status(400).json({ error: 'Host, Username, Password, and Database Name are required to test connection.' });
   }
 
-  const usesTunnel = !!bastionHost;
-  if (usesTunnel && (!bastionUser || !bastionPassword)) {
+  const tunnelFields = resolveTunnelFields({ host, dbUser, dbPassword, bastionHost, bastionPort, bastionUser, bastionPassword });
+  const usesTunnel = !!tunnelFields.bastionHost;
+
+  // Non-localhost tunnels still need explicit bastion credentials; localhost
+  // ones never do (they're derived from dbUser/dbPassword above).
+  if (usesTunnel && !tunnelFields.isLocalSsh && (!tunnelFields.bastionUser || !tunnelFields.bastionPassword)) {
     return res.status(400).json({ error: 'Bastion Host, Username, and Password are required when connecting through a bastion.' });
+  }
+
+  const resolvedBastionPort = Number(tunnelFields.bastionPort) || 22;
+
+  if (usesTunnel) {
+    const reachable = await checkTcpReachable(tunnelFields.bastionHost, resolvedBastionPort);
+    if (!reachable) {
+      const where = tunnelFields.isLocalSsh ? 'on this machine' : `on ${tunnelFields.bastionHost}`;
+      return res.status(400).json({
+        error: `Could not reach an SSH server ${where} at port ${resolvedBastionPort}. Is sshd running${tunnelFields.isLocalSsh ? ' locally' : ''}?`
+      });
+    }
   }
 
   const poolConfig = {
@@ -55,7 +96,7 @@ router.post('/test', async (req, res) => {
   let tunnel = null;
   if (usesTunnel) {
     tunnel = adHocTunnelStreamFactory(
-      { bastionHost, bastionPort: Number(bastionPort) || 22, bastionUser, bastionPassword },
+      { bastionHost: tunnelFields.bastionHost, bastionPort: resolvedBastionPort, bastionUser: tunnelFields.bastionUser, bastionPassword: tunnelFields.bastionPassword },
       host,
       Number(port) || 5432
     );
@@ -94,13 +135,15 @@ router.post('/', async (req, res) => {
   if (!label || !host || !dbUser || !dbPassword || !databaseName) {
     return res.status(400).json({ error: 'label, host, dbUser, dbPassword, and databaseName are required' });
   }
-  if (bastionHost && (!bastionUser || !bastionPassword)) {
+
+  const tunnelFields = resolveTunnelFields({ host, dbUser, dbPassword, bastionHost, bastionPort, bastionUser, bastionPassword });
+  if (tunnelFields.bastionHost && !tunnelFields.isLocalSsh && (!tunnelFields.bastionUser || !tunnelFields.bastionPassword)) {
     return res.status(400).json({ error: 'bastionUser and bastionPassword are required when bastionHost is set' });
   }
 
   try {
     const encryptedPassword = encrypt(dbPassword);
-    const encryptedBastionPassword = bastionPassword ? encrypt(bastionPassword) : null;
+    const encryptedBastionPassword = tunnelFields.bastionPassword ? encrypt(tunnelFields.bastionPassword) : null;
     const { rows } = await getAppPool().query(
       `INSERT INTO user_connections
         (user_id, label, host, port, db_user, db_password_encrypted, database_name, ssl_reject_unauthorized,
@@ -117,9 +160,9 @@ router.post('/', async (req, res) => {
         encryptedPassword,
         databaseName,
         !!sslRejectUnauthorized,
-        bastionHost || null,
-        bastionHost ? (Number(bastionPort) || 22) : null,
-        bastionUser || null,
+        tunnelFields.bastionHost || null,
+        tunnelFields.bastionHost ? (Number(tunnelFields.bastionPort) || 22) : null,
+        tunnelFields.bastionUser || null,
         encryptedBastionPassword
       ]
     );
@@ -142,8 +185,10 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'label, host, dbUser, and databaseName are required' });
   }
 
+  const tunnelFields = resolveTunnelFields({ host, dbUser, dbPassword, bastionHost, bastionPort, bastionUser, bastionPassword });
+
   const setDbPassword = !!(dbPassword && dbPassword.trim() !== '');
-  const setBastionPassword = !!(bastionPassword && bastionPassword.trim() !== '');
+  const setBastionPassword = !!(tunnelFields.bastionPassword && tunnelFields.bastionPassword.trim() !== '');
 
   // host/port/user fields always update directly; passwords only update if a
   // non-blank value was supplied, so leaving a password field blank keeps
@@ -160,9 +205,9 @@ router.put('/:id', async (req, res) => {
     dbUser,
     databaseName,
     !!sslRejectUnauthorized,
-    bastionHost || null,
-    bastionHost ? (Number(bastionPort) || 22) : null,
-    bastionUser || null
+    tunnelFields.bastionHost || null,
+    tunnelFields.bastionHost ? (Number(tunnelFields.bastionPort) || 22) : null,
+    tunnelFields.bastionUser || null
   ];
 
   if (setDbPassword) {
@@ -172,8 +217,8 @@ router.put('/:id', async (req, res) => {
 
   if (setBastionPassword) {
     fields.push(`bastion_password_encrypted = $${params.length + 1}`);
-    params.push(encrypt(bastionPassword));
-  } else if (!bastionHost) {
+    params.push(encrypt(tunnelFields.bastionPassword));
+  } else if (!tunnelFields.bastionHost) {
     // Bastion was removed entirely on this edit — clear any stored password
     // for it too, rather than leaving an orphaned encrypted value behind.
     fields.push(`bastion_password_encrypted = $${params.length + 1}`);
