@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { dbClient } from '../services/dbClient';
-import { extensionApi } from '../services/extensionBridge';
 
 const inputStyle = {
   width: '100%',
@@ -33,7 +32,13 @@ const ConnectionManager = ({ onSelectConnection }) => {
     dbPassword: '',
     databaseName: '',
     sslRejectUnauthorized: false,
-    isLocal: false
+    // Bastion/EC2 jump-host details — only needed when the DB isn't
+    // reachable directly (e.g. an internal RDS endpoint). Leave bastionHost
+    // blank to connect straight to `host` as before.
+    bastionHost: '',
+    bastionPort: '22',
+    bastionUser: '',
+    bastionPassword: ''
   };
 
   const [form, setForm] = useState(initialFormState);
@@ -67,10 +72,14 @@ const ConnectionManager = ({ onSelectConnection }) => {
       setError('Password is required to test a new connection.');
       return;
     }
+    if (form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
+      setError('Bastion Username and Password are required when a Bastion Host is set.');
+      return;
+    }
 
     setIsTesting(true);
     try {
-      const res = await dbClient.testConnection(form, form.isLocal);
+      const res = await dbClient.testConnection(form);
       setTestSuccess(res?.message || 'Connection test successful!');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Connection verification failed.');
@@ -92,10 +101,14 @@ const ConnectionManager = ({ onSelectConnection }) => {
       setError('Password is required for new configurations.');
       return;
     }
+    if (form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
+      setError('Bastion Username and Password are required when a Bastion Host is set.');
+      return;
+    }
 
     setIsSaving(true);
     try {
-      await dbClient.saveConnection(form, editingId, form.isLocal);
+      await dbClient.saveConnection(form, editingId);
       setForm(initialFormState);
       setShowForm(false);
       setEditingId(null);
@@ -120,7 +133,10 @@ const ConnectionManager = ({ onSelectConnection }) => {
       dbPassword: '', // Keep blank unless updating to protect existing records
       databaseName: conn.database_name,
       sslRejectUnauthorized: !!conn.ssl_reject_unauthorized,
-      isLocal: !!conn.isLocal
+      bastionHost: conn.bastion_host || '',
+      bastionPort: conn.bastion_port ? String(conn.bastion_port) : '22',
+      bastionUser: conn.bastion_user || '',
+      bastionPassword: '' // Keep blank unless updating to protect existing records
     });
     setShowForm(true);
   };
@@ -179,9 +195,9 @@ const ConnectionManager = ({ onSelectConnection }) => {
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {conn.label}
-                  {conn.isLocal && (
+                  {conn.bastion_host && (
                     <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent-purple)', border: '1px solid var(--accent-purple)', borderRadius: '10px', padding: '2px 8px' }}>
-                      Local
+                      Via Bastion
                     </span>
                   )}
                 </div>
@@ -253,20 +269,25 @@ const ConnectionManager = ({ onSelectConnection }) => {
           <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Database Name</label>
           <input style={inputStyle} placeholder="postgres" value={form.databaseName} onChange={e => handleFormChange('databaseName', e.target.value)} />
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-            <input
-              type="checkbox"
-              checked={form.isLocal}
-              disabled={!!editingId}
-              onChange={e => handleFormChange('isLocal', e.target.checked)}
-            />
-            This database is on my own machine (uses the browser extension)
+          <div style={{ marginTop: '8px', marginBottom: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              Bastion / SSH Tunnel (optional — only needed if the database isn't directly reachable)
+            </label>
+          </div>
+
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion (EC2) Host</label>
+          <input style={inputStyle} placeholder="ec2-xx-xx-xx-xx.compute.amazonaws.com" value={form.bastionHost} onChange={e => handleFormChange('bastionHost', e.target.value)} />
+
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Port</label>
+          <input style={inputStyle} type="number" value={form.bastionPort} onChange={e => handleFormChange('bastionPort', e.target.value)} />
+
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Username</label>
+          <input style={inputStyle} value={form.bastionUser} onChange={e => handleFormChange('bastionUser', e.target.value)} />
+
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Bastion SSH Password {editingId && <span style={{ opacity: 0.6 }}>(Leave blank to keep existing password)</span>}
           </label>
-          {form.isLocal && !extensionApi.isAvailable() && (
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '12px', padding: '8px 10px', backgroundColor: 'var(--bg-page)', borderRadius: '4px' }}>
-              Extension not detected yet. Make sure the DB Browser Local Bridge extension is installed and enabled, then reload this page.
-            </div>
-          )}
+          <input style={inputStyle} type="password" value={form.bastionPassword} onChange={e => handleFormChange('bastionPassword', e.target.value)} />
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
             <input type="checkbox" checked={form.sslRejectUnauthorized} onChange={e => handleFormChange('sslRejectUnauthorized', e.target.checked)} />
