@@ -27,9 +27,6 @@ async function loadOwnedConnection(connectionId, userId) {
 
   const conn = rows[0];
   conn.db_password = decrypt(conn.db_password_encrypted); // decrypt in memory only
-  if (conn.bastion_password_encrypted) {
-    conn.bastion_password = decrypt(conn.bastion_password_encrypted); // decrypt in memory only
-  }
   return conn;
 }
 

@@ -1,5 +1,4 @@
 const { Pool } = require('pg');
-const { persistentTunnelStreamFactory } = require('./sshTunnel');
 require('dotenv').config();
 
 // Two kinds of pools live in this app now:
@@ -54,12 +53,7 @@ function getUserPool(conn, databaseName) {
   const key = `${conn.id}:${databaseName}`;
   
   if (!userPools.has(key)) {
-    // Connections with bastion details go through the SSH tunnel (the DB
-    // host is only reachable from inside the bastion's network); everything
-    // else connects directly, same as before this feature was added.
-    const usesTunnel = !!conn.bastion_host;
-
-    const poolConfig = {
+    const pool = new Pool({
       user: conn.db_user,
       host: conn.host,
       database: databaseName,
@@ -71,13 +65,7 @@ function getUserPool(conn, databaseName) {
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
       max: Number(process.env.DB_POOL_MAX || 10)
-    };
-
-    if (usesTunnel) {
-      poolConfig.stream = persistentTunnelStreamFactory(conn);
-    }
-
-    const pool = new Pool(poolConfig);
+    });
     pool.on('error', (err) => {
       console.error(`Unexpected error on idle PostgreSQL client (user pool: ${key})`, err);
     });
