@@ -18,7 +18,7 @@ const api = axios.create({
     // Set VITE_API_URL in Vercel's project env vars, e.g.
     // https://your-backend.onrender.com/api. Falls back to a working
     // default so local dev / a fresh clone still work without a .env file.
-    baseURL: import.meta.env.VITE_API_URL || 'https://db-browser-2.onrender.com/api',
+    baseURL: import.meta.env.VITE_API_URL || 'https://db-browser-2.onrender.com/api' ,
 });
 
 api.interceptors.request.use((config) => {

@@ -5,21 +5,31 @@ const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelec
   const [databases, setDatabases] = useState([]);
   const [schemas, setSchemas] = useState([]);
   const [expandedDb, setExpandedDb] = useState(null);
+  const [dbError, setDbError] = useState(null);
+  const [schemaError, setSchemaError] = useState(null);
 
   // Initial load: Fetch databases
   useEffect(() => {
     if (!connectionId) return;
+    setDbError(null);
     dbClient.listDatabases(connectionId)
       .then(dbs => setDatabases(dbs))
-      .catch(err => console.error("Failed to fetch DBs", err));
+      .catch(err => {
+        console.error("Failed to fetch DBs", err);
+        setDbError(err.message || 'Failed to load databases.');
+      });
   }, [connectionId]);
 
   // Fetch schemas when a DB is expanded
   useEffect(() => {
     if (expandedDb && connectionId) {
+      setSchemaError(null);
       dbClient.listSchemas(connectionId, expandedDb)
         .then(schemas => setSchemas(schemas))
-        .catch(err => console.error("Failed to fetch schemas", err));
+        .catch(err => {
+          console.error("Failed to fetch schemas", err);
+          setSchemaError(err.message || 'Failed to load schemas.');
+        });
     }
   }, [expandedDb, connectionId]);
 
@@ -41,6 +51,18 @@ const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelec
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Databases
             </div>
+
+            {dbError && (
+              <div style={{ padding: '10px 12px', borderRadius: '4px', backgroundColor: 'var(--bg-page)', color: '#ef4444', fontSize: '0.8rem', border: '1px solid #ef444440' }}>
+                {dbError}
+              </div>
+            )}
+
+            {!dbError && databases.length === 0 && (
+              <div style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                Loading databases...
+              </div>
+            )}
 
             {databases.map(dbName => (
               <div key={dbName}>
@@ -65,6 +87,11 @@ const Sidebar = ({ connectionId, selectedDb, onSelectDb, selectedSchema, onSelec
                 {/* Schema Children */}
                 {expandedDb === dbName && (
                   <div style={{ paddingLeft: '24px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {schemaError && (
+                      <div style={{ padding: '6px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-page)', color: '#ef4444', fontSize: '0.75rem' }}>
+                        {schemaError}
+                      </div>
+                    )}
                     {schemas.map(schema => (
                       <div
                         key={schema}
