@@ -13,12 +13,6 @@ const inputStyle = {
   marginBottom: '12px'
 };
 
-// When the DB host is "localhost", the backend tunnels over SSH to that same
-// machine instead of connecting to Postgres directly, reusing the DB
-// username/password as the SSH login — so no separate bastion credentials
-// are ever needed for this case. See backend/src/routes/connectionRoutes.js.
-const isLocalhostHost = (host) => !!host && host.trim().toLowerCase() === 'localhost';
-
 const ConnectionManager = ({ onSelectConnection }) => {
   const [connections, setConnections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +72,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
       setError('Password is required to test a new connection.');
       return;
     }
-    if (!isLocalhostHost(form.host) && form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
+    if (form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
       setError('Bastion Username and Password are required when a Bastion Host is set.');
       return;
     }
@@ -107,7 +101,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
       setError('Password is required for new configurations.');
       return;
     }
-    if (!isLocalhostHost(form.host) && form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
+    if (form.bastionHost && (!form.bastionUser || (!editingId && !form.bastionPassword))) {
       setError('Bastion Username and Password are required when a Bastion Host is set.');
       return;
     }
@@ -203,7 +197,7 @@ const ConnectionManager = ({ onSelectConnection }) => {
                   {conn.label}
                   {conn.bastion_host && (
                     <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent-purple)', border: '1px solid var(--accent-purple)', borderRadius: '10px', padding: '2px 8px' }}>
-                      {isLocalhostHost(conn.bastion_host) ? 'Via Local SSH' : 'Via Bastion'}
+                      Via Bastion
                     </span>
                   )}
                 </div>
@@ -275,39 +269,25 @@ const ConnectionManager = ({ onSelectConnection }) => {
           <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Database Name</label>
           <input style={inputStyle} placeholder="postgres" value={form.databaseName} onChange={e => handleFormChange('databaseName', e.target.value)} />
 
-          {isLocalhostHost(form.host) ? (
-            <div style={{
-              marginTop: '8px', marginBottom: '16px', padding: '10px 12px',
-              backgroundColor: 'var(--bg-page)', border: '1px solid var(--accent-purple)',
-              borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)'
-            }}>
-              🔒 Host is <strong>localhost</strong> — connections will tunnel over SSH to this
-              machine (port 22) using the Database Username/Password above. No separate
-              bastion credentials needed.
-            </div>
-          ) : (
-            <>
-              <div style={{ marginTop: '8px', marginBottom: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Bastion / SSH Tunnel (optional — only needed if the database isn't directly reachable)
-                </label>
-              </div>
+          <div style={{ marginTop: '8px', marginBottom: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              Bastion / SSH Tunnel (optional — only needed if the database isn't directly reachable)
+            </label>
+          </div>
 
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion (EC2) Host</label>
-              <input style={inputStyle} placeholder="ec2-xx-xx-xx-xx.compute.amazonaws.com" value={form.bastionHost} onChange={e => handleFormChange('bastionHost', e.target.value)} />
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion (EC2) Host</label>
+          <input style={inputStyle} placeholder="ec2-xx-xx-xx-xx.compute.amazonaws.com" value={form.bastionHost} onChange={e => handleFormChange('bastionHost', e.target.value)} />
 
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Port</label>
-              <input style={inputStyle} type="number" value={form.bastionPort} onChange={e => handleFormChange('bastionPort', e.target.value)} />
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Port</label>
+          <input style={inputStyle} type="number" value={form.bastionPort} onChange={e => handleFormChange('bastionPort', e.target.value)} />
 
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Username</label>
-              <input style={inputStyle} value={form.bastionUser} onChange={e => handleFormChange('bastionUser', e.target.value)} />
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bastion SSH Username</label>
+          <input style={inputStyle} value={form.bastionUser} onChange={e => handleFormChange('bastionUser', e.target.value)} />
 
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Bastion SSH Password {editingId && <span style={{ opacity: 0.6 }}>(Leave blank to keep existing password)</span>}
-              </label>
-              <input style={inputStyle} type="password" value={form.bastionPassword} onChange={e => handleFormChange('bastionPassword', e.target.value)} />
-            </>
-          )}
+          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Bastion SSH Password {editingId && <span style={{ opacity: 0.6 }}>(Leave blank to keep existing password)</span>}
+          </label>
+          <input style={inputStyle} type="password" value={form.bastionPassword} onChange={e => handleFormChange('bastionPassword', e.target.value)} />
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
             <input type="checkbox" checked={form.sslRejectUnauthorized} onChange={e => handleFormChange('sslRejectUnauthorized', e.target.checked)} />
