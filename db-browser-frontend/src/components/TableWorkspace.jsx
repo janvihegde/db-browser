@@ -7,6 +7,8 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import api from '../services/api';
 import { dbClient } from '../services/dbClient';
 import Toast from './Toast.jsx';
+import SummarizeCell from './SummarizeCell.jsx';
+import SummarizeBar from './SummarizeBar.jsx';
 
 const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -17,6 +19,9 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 
   // Columns Metadata State
   const [columnsData, setColumnsData] = useState([]);
+  // Same data, fetched proactively (not tied to the Columns tab being open)
+  // so the Summarize bar on Data Preview has data types ready immediately.
+  const [columnsMeta, setColumnsMeta] = useState([]);
 
   // Relationships State
   const [relationships, setRelationships] = useState({ outgoing: [], incoming: [] });
@@ -36,7 +41,6 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
 
  // Helper function to format dates to YYYY-MM-DD
   // Helper function to intercept and format data BEFORE AG Grid sees it
-  // Helper function to intercept and format data BEFORE AG Grid sees it
   const sanitizeData = (rows) => {
     if (!Array.isArray(rows)) return [];
 
@@ -47,15 +51,11 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
         const val = cleanedRow[key];
         if (!val) return; // Skip nulls
 
-        // 1. ISO String check (e.g., "2025-12-31T18:30:00.000Z")
+        // 1. ISO String check (e.g., "2026-07-15T12:00:00.000Z")
         if (typeof val === 'string' && val.includes('T')) {
-          const dateObj = new Date(val);
-          // Verify it parsed correctly before updating
-          if (!isNaN(dateObj.getTime())) {
-            const yyyy = dateObj.getFullYear(); // Correctly grabs the local year (e.g., 2026)
-            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const dd = String(dateObj.getDate()).padStart(2, '0');
-            cleanedRow[key] = `${yyyy}-${mm}-${dd}`;
+          const datePart = val.split('T')[0];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            cleanedRow[key] = datePart;
             return;
           }
         }
@@ -85,6 +85,15 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
     dbClient.getRowCount(connectionId, db, schema, table)
       .then(count => setRowCount(count))
       .catch(err => console.error("Failed to fetch count:", err));
+  }, [connectionId, db, schema, table]);
+
+  // Fetch column metadata whenever the table changes, regardless of active
+  // tab - the Summarize bar on Data Preview needs data types up front.
+  useEffect(() => {
+    if (!db || !schema || !table) return;
+    dbClient.listColumns(connectionId, db, schema, table)
+      .then(cols => setColumnsMeta(Array.isArray(cols) ? cols : []))
+      .catch(err => console.error("Failed to fetch column metadata:", err));
   }, [connectionId, db, schema, table]);
 
   // Fetch data when switching tabs
@@ -192,6 +201,22 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
     { field: 'is_foreign_key', headerName: 'FK', width: 100, cellRenderer: (params) => params.value ? '🔗 Yes' : '' },
     { field: 'is_nullable', headerName: 'Nullable', width: 120, sortable: true, filter: true },
     { field: 'column_default', headerName: 'Default Value', flex: 1, sortable: true, filter: true },
+    {
+      headerName: 'Summarize',
+      width: 260,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params) => (
+        <SummarizeCell
+          connectionId={connectionId}
+          db={db}
+          schema={schema}
+          table={table}
+          column={params.data.column_name}
+          dataType={params.data.data_type}
+        />
+      ),
+    },
   ];
 
   const relationshipCardStyle = {
@@ -242,8 +267,19 @@ const TableWorkspace = ({ connectionId, db, schema, table, onBack }) => {
             <CircularProgress size={32} sx={{ color: 'var(--accent-indigo)' }} />
           </div>
         ) : activeTab === 0 ? (
-          <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-            <AgGridReact theme="legacy" rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {columnsMeta.length > 0 && (
+              <SummarizeBar
+                connectionId={connectionId}
+                db={db}
+                schema={schema}
+                table={table}
+                columns={columnsMeta}
+              />
+            )}
+            <div className="ag-theme-alpine" style={{ flexGrow: 1, width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+              <AgGridReact theme="legacy" rowData={rowData} columnDefs={columnDefs} pagination={true} paginationPageSize={100} />
+            </div>
           </div>
         ) : activeTab === 1 ? (
           <div className="ag-theme-alpine" style={{ height: '100%', width: '100%', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
