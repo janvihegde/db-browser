@@ -90,31 +90,52 @@ export const dbClient = {
   async saveConnection(form, editingId, isLocal) {
     if (isLocal) {
       const list = loadLocalConnections();
-      if (editingId) {
-        const idx = list.findIndex((c) => c.id === editingId);
-        if (idx === -1) throw new Error('Local connection not found.');
+      const idx = editingId ? list.findIndex((c) => c.id === editingId) : -1;
+      if (idx !== -1) {
+        // Editing a connection that was already local.
         list[idx] = {
           ...list[idx],
           ...form,
           // Blank password on edit means "keep the existing one"
           dbPassword: form.dbPassword?.trim() ? form.dbPassword : list[idx].dbPassword,
         };
-      } else {
-        list.push({
-          ...form,
-          id: `local-${crypto.randomUUID()}`,
-          created_at: new Date().toISOString(),
-        });
+        saveLocalConnections(list);
+        return { id: editingId };
       }
+
+      // Either a brand new connection, or an existing HOSTED connection
+      // being converted to local for the first time (editingId points at
+      // a server-side row, not a local one - it'll never be found above).
+      // Either way, create a fresh local entry.
+      const newId = `local-${crypto.randomUUID()}`;
+      list.push({
+        ...form,
+        id: newId,
+        created_at: new Date().toISOString(),
+      });
       saveLocalConnections(list);
-      return;
+
+      // If this was converting an existing hosted connection, remove the
+      // old server-side row so it doesn't linger as a separate, permanently
+      // broken duplicate (it can never work as a hosted connection if the
+      // host is the user's own machine).
+      if (editingId && !String(editingId).startsWith('local-')) {
+        try {
+          await api.delete(`/connections/${editingId}`);
+        } catch (err) {
+          console.error('Could not remove the old hosted connection after converting it to local:', err);
+        }
+      }
+
+      return { id: newId };
     }
 
     if (editingId) {
       await api.put(`/connections/${editingId}`, form);
-    } else {
-      await api.post('/connections', form);
+      return { id: editingId };
     }
+    const res = await api.post('/connections', form);
+    return { id: res.data?.connection?.id };
   },
 
   async deleteConnection(id) {

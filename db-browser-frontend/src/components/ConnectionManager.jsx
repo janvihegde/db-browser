@@ -95,11 +95,18 @@ const ConnectionManager = ({ onSelectConnection }) => {
 
     setIsSaving(true);
     try {
-      await dbClient.saveConnection(form, editingId, form.isLocal);
+      const { id: savedId } = await dbClient.saveConnection(form, editingId, form.isLocal);
       setForm(initialFormState);
       setShowForm(false);
+      const wasConverted = editingId && savedId && savedId !== editingId;
       setEditingId(null);
       loadConnections();
+      // If editing converted this connection to a new id (hosted -> local),
+      // make sure whatever's currently selected follows it - otherwise the
+      // app keeps pointing at the old id, which no longer exists.
+      if (wasConverted) {
+        onSelectConnection(savedId);
+      }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to persist transaction parameters.');
     } finally {
